@@ -39,7 +39,7 @@
     --header-h: 60px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  html, body { height: 100%; width: 100%; overflow: hidden; background: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
+  html, body { height: 100%; width: 100%; overflow: hidden; background: var(--navy); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
 
   /* ── Header ── */
   .header {
@@ -58,22 +58,19 @@
   /* ── Bottom Nav ── */
   .nav {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
-    height: var(--nav-h);
-    background: #ffffff;
-    border-top: 1px solid var(--border);
+    height: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+    background: var(--navy);
+    border-top: none;
     display: flex;
-    padding-bottom: 0;
-  }
-  @supports (padding-bottom: env(safe-area-inset-bottom)) {
-    .nav { padding-bottom: env(safe-area-inset-bottom); }
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .nav-btn {
     flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
     gap: 2px; cursor: pointer; transition: all .2s;
-    background: none; border: none; color: var(--text-muted);
+    background: none; border: none; color: rgba(255,255,255,0.45);
     padding-bottom: 4px;
   }
-  .nav-btn.active { color: var(--accent); }
+  .nav-btn.active { color: #ffffff; }
   .nav-btn svg { width: 20px; height: 20px; }
   .nav-label { font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
 
