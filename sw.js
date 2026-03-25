@@ -1,8 +1,8 @@
-var CACHE_NAME = 'london-trip-v1';
+var CACHE_NAME = 'london-trip-v2';
 var URLS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
+  '/london-trip/',
+  '/london-trip/index.html',
+  '/london-trip/manifest.json',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 ];
