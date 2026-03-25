@@ -1,4 +1,4 @@
-var CACHE_NAME = 'london-trip-v2';
+var CACHE_NAME = 'london-trip-v3';
 var URLS_TO_CACHE = [
   '/london-trip/',
   '/london-trip/index.html',
