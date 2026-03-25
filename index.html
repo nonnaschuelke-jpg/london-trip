@@ -221,7 +221,7 @@
 
   /* ── Map Screen ── */
   .map-legend {
-    position: absolute; bottom: 8px; left: 12px; right: 12px; z-index: 1100;
+    position: absolute; bottom: 10px; left: 12px; right: 12px; z-index: 1100;
     background: rgba(255,255,255,0.92);
     backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--border);
@@ -254,6 +254,8 @@
   .map-tool-btn:hover { background: white; color: var(--accent); }
   .map-tool-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
   .map-tool-btn svg { width: 18px; height: 18px; }
+
+  .leaflet-control-attribution { display: none !important; }
 
   /* ── Map Popups ── */
   .leaflet-popup-content-wrapper {
