@@ -575,6 +575,14 @@
       <div class="modal-label">Details</div>
       <textarea class="modal-input modal-textarea" id="modal-detail" placeholder="Description, address, tips..."></textarea>
     </div>
+    <div class="modal-field">
+      <div class="modal-label">Google Maps search (place name or address)</div>
+      <input class="modal-input" id="modal-maps" placeholder="e.g. Borough Market, London">
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">Wikipedia article (optional)</div>
+      <input class="modal-input" id="modal-wiki" placeholder="e.g. Borough_Market">
+    </div>
     <div class="modal-btns">
       <button class="modal-btn modal-btn--cancel" onclick="closeModal()">Cancel</button>
       <button class="modal-btn modal-btn--save" onclick="saveModal()">Save</button>
@@ -1786,10 +1794,28 @@ function editActivity(actEl) {
   var timeEl = actEl.querySelector('.activity-time');
   var nameEl = actEl.querySelector('.activity-name');
   var detailEl = actEl.querySelector('.activity-detail');
+  var mapsLink = actEl.querySelector('.activity-link--maps');
+  var wikiLink = actEl.querySelector('.activity-link--wiki');
   document.getElementById('modal-title').textContent = 'Edit Activity';
   document.getElementById('modal-time').value = timeEl ? timeEl.textContent.replace(/[^\d:]/g, '') : '';
   document.getElementById('modal-name').value = nameEl ? nameEl.textContent : '';
   document.getElementById('modal-detail').value = detailEl ? detailEl.textContent : '';
+  // Extract Maps query from URL
+  if (mapsLink) {
+    var mUrl = mapsLink.href || '';
+    var mMatch = mUrl.match(/query=([^&]*)/);
+    document.getElementById('modal-maps').value = mMatch ? decodeURIComponent(mMatch[1]) : '';
+  } else {
+    document.getElementById('modal-maps').value = nameEl ? nameEl.textContent + ', London' : '';
+  }
+  // Extract Wiki article from URL
+  if (wikiLink) {
+    var wUrl = wikiLink.href || '';
+    var wMatch = wUrl.match(/wiki\/([^#?]*)/);
+    document.getElementById('modal-wiki').value = wMatch ? decodeURIComponent(wMatch[1]) : '';
+  } else {
+    document.getElementById('modal-wiki').value = '';
+  }
   document.getElementById('edit-modal').classList.add('visible');
 }
 
@@ -1799,6 +1825,8 @@ function addActivity(dayId) {
   document.getElementById('modal-time').value = '';
   document.getElementById('modal-name').value = '';
   document.getElementById('modal-detail').value = '';
+  document.getElementById('modal-maps').value = '';
+  document.getElementById('modal-wiki').value = '';
   document.getElementById('edit-modal').classList.add('visible');
 }
 
@@ -1807,17 +1835,29 @@ function closeModal() {
   editTarget = null;
 }
 
+function buildLinksHtml(maps, wiki) {
+  var html = '';
+  if (!maps && !wiki) return '';
+  html += '<div class="activity-links">';
+  if (wiki) {
+    html += '<a class="activity-link activity-link--wiki" href="https://en.wikipedia.org/wiki/' + encodeURI(wiki) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + WIKI_ICON + ' Wiki</a>';
+  }
+  if (maps) {
+    html += '<a class="activity-link activity-link--maps" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(maps) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + MAPS_ICON + ' Maps</a>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function saveModal() {
   var time = document.getElementById('modal-time').value || '';
   var name = document.getElementById('modal-name').value.trim();
   var detail = document.getElementById('modal-detail').value.trim();
+  var maps = document.getElementById('modal-maps').value.trim();
+  var wiki = document.getElementById('modal-wiki').value.trim();
   if (!name) { closeModal(); return; }
 
-  // Format time for display
   var timeDisplay = time;
-  if (time && time.indexOf(':') > -1) {
-    timeDisplay = time; // Already HH:MM
-  }
 
   if (editTarget && editTarget.actEl) {
     // Editing existing
@@ -1834,7 +1874,14 @@ function saveModal() {
       d.textContent = detail;
       nameEl.parentNode.insertBefore(d, nameEl.nextSibling);
     }
-    persistEdit(act.id, timeDisplay, name, detail);
+    // Update links
+    var oldLinks = act.querySelector('.activity-links');
+    if (oldLinks) oldLinks.remove();
+    var content = act.querySelector('.activity-content');
+    if (content && (maps || wiki)) {
+      content.insertAdjacentHTML('beforeend', buildLinksHtml(maps, wiki));
+    }
+    persistEdit(act.id, timeDisplay, name, detail, null, maps, wiki);
   } else if (editTarget && editTarget.newDay) {
     // Adding new
     var dayBody = document.querySelector('#' + editTarget.newDay + ' .day-body');
@@ -1853,6 +1900,7 @@ function saveModal() {
         (timeDisplay ? '<div class="activity-time">' + timeDisplay + '</div>' : '') +
         '<div class="activity-name">' + name + '</div>' +
         (detail ? '<div class="activity-detail">' + detail + '</div>' : '') +
+        buildLinksHtml(maps, wiki) +
       '</div>' +
       '<div class="activity-actions">' +
         '<div class="act-btn" onclick="event.stopPropagation();editActivity(this.closest(\'.activity\'))">✎</div>' +
@@ -1861,12 +1909,11 @@ function saveModal() {
 
     dayBody.insertBefore(actHtml, addBtn);
 
-    // Update dayActivities
     var dayKey = 'day-' + dayNum;
     if (!dayActivities[dayKey]) dayActivities[dayKey] = [];
     dayActivities[dayKey].push(newId);
     updateAllProgress();
-    persistEdit('act-' + newId, timeDisplay, name, detail, editTarget.newDay);
+    persistEdit('act-' + newId, timeDisplay, name, detail, editTarget.newDay, maps, wiki);
   }
   closeModal();
 }
@@ -1897,9 +1944,9 @@ function deleteActivity(actEl) {
   }, 220);
 }
 
-function persistEdit(actId, time, name, detail, newDay) {
+function persistEdit(actId, time, name, detail, newDay, maps, wiki) {
   var edits = loadEdits();
-  edits[actId] = { time: time, name: name, detail: detail };
+  edits[actId] = { time: time, name: name, detail: detail, maps: maps || '', wiki: wiki || '' };
   if (newDay) edits[actId].newDay = newDay;
   saveEdits(edits);
 }
@@ -1914,7 +1961,6 @@ function applyStoredEdits() {
       return;
     }
     if (edit.newDay) {
-      // Re-create added activities
       var dayBody = document.querySelector('#' + edit.newDay + ' .day-body');
       if (!dayBody || document.getElementById(actId)) return;
       var act = document.createElement('div');
@@ -1928,6 +1974,7 @@ function applyStoredEdits() {
           (edit.time ? '<div class="activity-time">' + edit.time + '</div>' : '') +
           '<div class="activity-name">' + edit.name + '</div>' +
           (edit.detail ? '<div class="activity-detail">' + edit.detail + '</div>' : '') +
+          buildLinksHtml(edit.maps, edit.wiki) +
         '</div>';
       dayBody.appendChild(act);
       var dayNum = edit.newDay.replace('day-', '');
@@ -1935,7 +1982,6 @@ function applyStoredEdits() {
       if (!dayActivities[dayKey]) dayActivities[dayKey] = [];
       if (dayActivities[dayKey].indexOf(rawId) === -1) dayActivities[dayKey].push(rawId);
     } else {
-      // Apply edits to existing activities
       var el = document.getElementById(actId);
       if (!el) return;
       var timeEl = el.querySelector('.activity-time');
@@ -1944,6 +1990,13 @@ function applyStoredEdits() {
       if (timeEl && edit.time) timeEl.textContent = edit.time;
       if (nameEl && edit.name) nameEl.textContent = edit.name;
       if (detailEl && edit.detail) detailEl.textContent = edit.detail;
+      // Update links
+      if (edit.maps || edit.wiki) {
+        var oldLinks = el.querySelector('.activity-links');
+        if (oldLinks) oldLinks.remove();
+        var content = el.querySelector('.activity-content');
+        if (content) content.insertAdjacentHTML('beforeend', buildLinksHtml(edit.maps, edit.wiki));
+      }
     }
   });
 }
