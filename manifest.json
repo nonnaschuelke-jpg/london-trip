@@ -2,7 +2,7 @@
   "name": "London Trip · April 2026",
   "short_name": "London Trip",
   "description": "Travel companion for London, 4-9 April 2026",
-  "start_url": "/index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f8f9fc",
   "theme_color": "#1a2b4a",
