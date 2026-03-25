@@ -1,0 +1,1668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#1a2b4a">
+<title>London Trip · April 2026</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root {
+    --navy: #1a2b4a;
+    --navy-mid: #243656;
+    --navy-light: #2d4268;
+    --accent: #2563eb;
+    --accent2: #3b82f6;
+    --accent-soft: rgba(37,99,235,0.08);
+    --gold: #d97706;
+    --gold-soft: rgba(217,119,6,0.10);
+    --green: #16a34a;
+    --green-soft: rgba(22,163,74,0.10);
+    --red: #ef4444;
+    --bg: #f8f9fc;
+    --bg-card: #ffffff;
+    --border: #e5e7ee;
+    --border-light: #f0f1f5;
+    --text: #1a1a2e;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+    --shadow-lg: 0 10px 30px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
+    --radius: 16px;
+    --radius-sm: 12px;
+    --nav-h: 68px;
+    --header-h: 60px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; width: 100%; overflow: hidden; background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
+
+  /* ── Header ── */
+  .header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    height: var(--header-h);
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px;
+    padding-top: env(safe-area-inset-top);
+  }
+  .header-title { font-size: 19px; font-weight: 800; letter-spacing: -0.3px; color: var(--navy); }
+  .header-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; font-weight: 500; }
+  .header-flag { font-size: 26px; }
+
+  /* ── Bottom Nav ── */
+  .nav {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    height: var(--nav-h);
+    background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border);
+    display: flex;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .nav-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 4px; cursor: pointer; transition: all .2s;
+    background: none; border: none; color: var(--text-muted);
+    padding-bottom: 4px;
+  }
+  .nav-btn.active { color: var(--accent); }
+  .nav-btn svg { width: 24px; height: 24px; }
+  .nav-label { font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
+
+  /* ── Screens ── */
+  .screen {
+    position: fixed; top: var(--header-h); left: 0; right: 0;
+    bottom: var(--nav-h);
+    overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    display: none;
+    padding: 16px 16px 20px;
+    background: var(--bg);
+  }
+  .screen.active { display: block; }
+  #screen-map { padding: 0; overflow: hidden; }
+  #screen-map > * { animation: none !important; }
+  #map { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: auto; height: auto; }
+
+  /* ── Day Cards ── */
+  .day-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 14px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow .2s;
+  }
+  .day-card:hover { box-shadow: var(--shadow-md); }
+  .day-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 18px 14px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .day-header-left { display: flex; align-items: center; gap: 12px; }
+  .day-badge {
+    background: var(--accent-soft);
+    border-radius: 10px;
+    padding: 5px 11px;
+    font-size: 11px; font-weight: 700; color: var(--accent);
+    white-space: nowrap;
+    letter-spacing: 0.2px;
+  }
+  .day-title { font-size: 15px; font-weight: 700; color: var(--text); }
+  .day-subtitle { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .day-chevron { color: var(--text-muted); font-size: 14px; transition: transform .25s; }
+  .day-card.collapsed .day-chevron { transform: rotate(-90deg); }
+  .day-progress-bar {
+    height: 3px;
+    background: var(--border-light);
+    position: relative;
+  }
+  .day-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    transition: width .4s ease;
+  }
+  .day-body { }
+  .day-card.collapsed .day-body { display: none; }
+
+  /* ── Activity Items ── */
+  .activity {
+    display: flex; align-items: flex-start;
+    padding: 12px 18px;
+    border-top: 1px solid var(--border-light);
+    gap: 12px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .activity:active { background: var(--accent-soft); }
+  .activity.done { opacity: 0.5; }
+  .activity-check {
+    width: 22px; height: 22px; flex-shrink: 0;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 1px;
+    transition: all .2s;
+    background: transparent;
+  }
+  .activity.done .activity-check {
+    background: var(--green);
+    border-color: var(--green);
+  }
+  .check-icon { display: none; }
+  .activity.done .check-icon { display: block; }
+  .activity-content { flex: 1; min-width: 0; }
+  .activity-time {
+    font-size: 11px; color: var(--accent); font-weight: 700;
+    letter-spacing: 0.5px; margin-bottom: 3px;
+  }
+  .activity-name {
+    font-size: 14px; font-weight: 600; line-height: 1.35; color: var(--text);
+  }
+  .activity.done .activity-name { text-decoration: line-through; color: var(--text-muted); }
+  .activity-detail {
+    font-size: 12px; color: var(--text-secondary); margin-top: 3px; line-height: 1.5;
+  }
+  .activity.done .activity-detail { color: var(--text-muted); }
+  .booked-badge {
+    display: inline-block; margin-top: 6px;
+    background: var(--green-soft);
+    border: 1px solid rgba(22,163,74,0.25);
+    color: var(--green);
+    font-size: 10px; font-weight: 700;
+    padding: 3px 8px; border-radius: 6px;
+    letter-spacing: 0.5px;
+  }
+
+  .activity-links {
+    display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;
+  }
+  .activity-link {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600; text-decoration: none;
+    padding: 4px 10px; border-radius: 8px;
+    transition: opacity .15s;
+    line-height: 1;
+  }
+  .activity-link:active { opacity: 0.7; }
+  .activity-link--wiki {
+    background: rgba(37,99,235,0.08); color: var(--accent);
+  }
+  .activity-link--maps {
+    background: rgba(22,163,74,0.08); color: var(--green);
+  }
+  .activity-link svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+  /* ── Progress Summary ── */
+  .progress-summary {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  .progress-ring-wrap { position: relative; flex-shrink: 0; }
+  .progress-ring { transform: rotate(-90deg); }
+  .progress-ring-bg { fill: none; stroke: var(--border-light); stroke-width: 4; }
+  .progress-ring-fill { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset .5s ease; }
+  .progress-pct { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: var(--accent); }
+  .progress-text h3 { font-size: 15px; font-weight: 700; color: var(--text); }
+  .progress-text p { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+
+  /* ── Map Screen ── */
+  .map-legend {
+    position: absolute; bottom: 12px; left: 12px; right: 12px; z-index: 1100;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    font-size: 12px;
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    box-shadow: var(--shadow-md);
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 5px; color: var(--text-secondary); font-weight: 500;
+    cursor: pointer; padding: 3px 8px; border-radius: 8px; transition: all .15s;
+    user-select: none;
+  }
+  .legend-item:hover { background: var(--accent-soft); }
+  .legend-item.inactive { opacity: 0.35; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .map-toolbar {
+    position: absolute; top: 12px; right: 12px; z-index: 1100;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .map-tool-btn {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: rgba(255,255,255,0.92); backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all .15s; color: var(--text-secondary);
+  }
+  .map-tool-btn:hover { background: white; color: var(--accent); }
+  .map-tool-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .map-tool-btn svg { width: 18px; height: 18px; }
+
+  /* ── Map Popups ── */
+  .leaflet-popup-content-wrapper {
+    background: var(--bg-card) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 14px !important;
+    box-shadow: var(--shadow-lg) !important;
+    overflow: hidden;
+  }
+  .leaflet-popup-tip { background: var(--bg-card) !important; }
+  .leaflet-popup-close-button { color: var(--text-muted) !important; font-size: 18px !important; top: 8px !important; right: 10px !important; z-index: 10; }
+  .leaflet-popup-content { margin: 0 !important; min-width: 220px; font-family: -apple-system, sans-serif !important; }
+  .popup-color-bar { height: 4px; width: 100%; }
+  .popup-body { padding: 14px 16px; }
+  .popup-name { font-size: 15px; font-weight: 700; margin-bottom: 4px; color: var(--text); }
+  .popup-day { font-size: 12px; margin-bottom: 6px; font-weight: 600; }
+  .popup-addr { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.4; }
+  .popup-nav-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--navy); color: #fff;
+    border: none; border-radius: 10px;
+    padding: 9px 16px; font-size: 13px; font-weight: 600;
+    cursor: pointer; text-decoration: none;
+    transition: opacity .15s;
+    letter-spacing: 0.2px;
+  }
+  .popup-nav-btn:hover { opacity: 0.85; }
+
+  /* ── Weather Screen ── */
+  .weather-hero {
+    background: linear-gradient(135deg, var(--navy), var(--navy-mid));
+    border-radius: var(--radius);
+    padding: 28px 22px;
+    margin-bottom: 14px;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+    color: white;
+  }
+  .weather-city { font-size: 12px; color: rgba(255,255,255,0.6); letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; }
+  .weather-temp { font-size: 64px; font-weight: 200; line-height: 1; margin: 8px 0 4px; color: white; }
+  .weather-desc { font-size: 16px; color: rgba(255,255,255,0.7); font-weight: 500; }
+  .weather-range { font-size: 13px; color: rgba(255,255,255,0.5); margin-top: 8px; }
+  .weather-icon { font-size: 52px; margin-bottom: 4px; }
+
+  .forecast-row {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow-sm);
+  }
+  .forecast-item {
+    display: flex; align-items: center;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border-light);
+    gap: 12px;
+  }
+  .forecast-item:last-child { border-bottom: none; }
+  .forecast-day { width: 42px; font-size: 14px; font-weight: 700; color: var(--text); }
+  .forecast-date { font-size: 11px; color: var(--text-muted); }
+  .forecast-icon { font-size: 24px; flex: 0 0 36px; text-align: center; }
+  .forecast-desc { flex: 1; font-size: 13px; color: var(--text-secondary); }
+  .forecast-temps { display: flex; gap: 8px; align-items: center; }
+  .forecast-hi { font-size: 15px; font-weight: 700; color: var(--text); }
+  .forecast-lo { font-size: 13px; color: var(--text-muted); }
+
+  .weather-detail-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; margin-bottom: 14px;
+  }
+  .weather-detail-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  .weather-detail-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .weather-detail-val { font-size: 22px; font-weight: 700; margin-top: 4px; color: var(--text); }
+  .weather-detail-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .weather-note {
+    background: var(--accent-soft);
+    border: 1px solid rgba(37,99,235,0.15);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    font-size: 13px; color: var(--accent); line-height: 1.5;
+    font-weight: 500;
+  }
+
+  /* ── Currency Screen ── */
+  .currency-hero {
+    background: linear-gradient(135deg, var(--navy), var(--navy-mid));
+    border-radius: var(--radius);
+    padding: 28px 22px;
+    margin-bottom: 14px;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+    color: white;
+  }
+  .rate-display { font-size: 13px; color: rgba(255,255,255,0.6); margin-bottom: 4px; letter-spacing: 0.5px; }
+  .rate-big { font-size: 28px; font-weight: 800; color: white; }
+  .rate-updated { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 6px; }
+
+  .converter-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 18px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow-sm);
+  }
+  .input-group { margin-bottom: 14px; }
+  .input-label {
+    font-size: 11px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px;
+  }
+  .flag-input-row { display: flex; align-items: center; gap: 10px; }
+  .flag-label { font-size: 28px; }
+  .currency-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    font-size: 28px; font-weight: 700;
+    color: var(--text);
+    outline: none;
+    width: 100%;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .currency-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .currency-input.result { color: var(--accent); background: var(--accent-soft); }
+  .currency-sym { font-size: 18px; color: var(--text-muted); margin-right: 4px; }
+  .swap-btn {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--accent); font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 10px auto;
+    cursor: pointer; transition: all .15s;
+    box-shadow: var(--shadow-sm);
+  }
+  .swap-btn:active { background: var(--accent); color: white; border-color: var(--accent); }
+
+  .quick-btns { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 14px; }
+  .quick-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .15s;
+    box-shadow: var(--shadow-sm);
+  }
+  .quick-btn:active { background: var(--accent); border-color: var(--accent); color: white; }
+  .quick-btn:active .qb-gbp { color: rgba(255,255,255,0.7); }
+  .quick-btn .qb-eur { font-size: 14px; font-weight: 700; color: var(--text); }
+  .quick-btn .qb-gbp { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+  .rate-edit-row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow-sm);
+  }
+  .rate-edit-label { font-size: 13px; color: var(--text-secondary); flex: 1; }
+  .rate-edit-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 15px; font-weight: 700;
+    color: var(--accent);
+    width: 90px; text-align: center;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .rate-edit-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  .tip-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .tip-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  .tip-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; margin-bottom: 4px; }
+  .tip-val { font-size: 20px; font-weight: 800; color: var(--gold); }
+  .tip-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Scrollbar */
+  .screen::-webkit-scrollbar { width: 4px; }
+  .screen::-webkit-scrollbar-track { background: transparent; }
+  .screen::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Loading */
+  .loading-wrap {
+    display: flex; align-items: center; justify-content: center;
+    padding: 40px 0; gap: 10px; color: var(--text-muted); font-size: 14px; font-weight: 500;
+  }
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Animations */
+  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+  .screen.active > * { animation: fadeIn .25s ease both; }
+  .screen.active > *:nth-child(2) { animation-delay: .04s; }
+  .screen.active > *:nth-child(3) { animation-delay: .08s; }
+  .screen.active > *:nth-child(4) { animation-delay: .12s; }
+  .screen.active > *:nth-child(5) { animation-delay: .16s; }
+  .screen.active > *:nth-child(6) { animation-delay: .20s; }
+  .screen.active > *:nth-child(7) { animation-delay: .24s; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div>
+    <div class="header-title">London Trip</div>
+    <div class="header-sub">4 – 9 April 2026</div>
+  </div>
+  <div class="header-flag">🇬🇧</div>
+</header>
+
+<!-- ══════════════════ SCREEN: ITINERARY ══════════════════ -->
+<div class="screen active" id="screen-itinerary">
+
+  <!-- Progress summary -->
+  <div class="progress-summary">
+    <div class="progress-ring-wrap">
+      <svg class="progress-ring" width="52" height="52">
+        <circle class="progress-ring-bg" cx="26" cy="26" r="21"/>
+        <circle class="progress-ring-fill" id="ring-fill" cx="26" cy="26" r="21"
+          stroke-dasharray="132" stroke-dashoffset="132"/>
+      </svg>
+      <div class="progress-pct" id="pct-text">0%</div>
+    </div>
+    <div class="progress-text">
+      <h3 id="progress-label">Trip Progress</h3>
+      <p id="progress-sub">Tap activities to mark as done</p>
+    </div>
+  </div>
+
+  <!-- Day 1 -->
+  <div class="day-card" id="day-1">
+    <div class="day-header" onclick="toggleDay('day-1')">
+      <div class="day-header-left">
+        <div>
+          <div class="day-badge">Day 1 · Sat 4 Apr</div>
+        </div>
+      </div>
+      <div>
+        <div class="day-title">✈️ Arrival</div>
+        <div class="day-subtitle">Stansted → Vauxhall</div>
+      </div>
+      <div class="day-chevron">›</div>
+    </div>
+    <div class="day-progress-bar"><div class="day-progress-fill" id="prog-day-1" style="width:0%"></div></div>
+    <div class="day-body">
+      <div class="activity" id="act-d1-0" onclick="toggleActivity('d1-0')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">22:35</div>
+          <div class="activity-name">Land at Stansted Airport</div>
+          <div class="activity-detail">London Stansted (STN). Third-busiest London airport, 48 km northeast of central London. Follow signs to the Stansted Express platform right inside the terminal.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d1-1" onclick="toggleActivity('d1-1')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">23:15</div>
+          <div class="activity-name">Stansted Express</div>
+          <div class="activity-detail">To Liverpool Street station. The fastest way into London — 47 minutes, runs every 15 min. Buy tickets in advance online for the best price (~£20 one way).</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d1-2" onclick="toggleActivity('d1-2')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">00:15</div>
+          <div class="activity-name">Uber to Hotel</div>
+          <div class="activity-detail">Liverpool Street → Vauxhall</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d1-3" onclick="toggleActivity('d1-3')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">00:30</div>
+          <div class="activity-name">Check-in · Staybridge Suites</div>
+          <div class="activity-detail">100 Vauxhall Walk SE11 5EL. Extended-stay hotel with kitchen in every room — great for storing snacks and leftovers. 24-hour front desk so late check-in is no problem.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Day 2 -->
+  <div class="day-card" id="day-2">
+    <div class="day-header" onclick="toggleDay('day-2')">
+      <div class="day-header-left">
+        <div class="day-badge">Day 2 · Sun 5 Apr</div>
+      </div>
+      <div>
+        <div class="day-title">🏛️ Westminster + Covent Garden</div>
+        <div class="day-subtitle">9 activities</div>
+      </div>
+      <div class="day-chevron">›</div>
+    </div>
+    <div class="day-progress-bar"><div class="day-progress-fill" id="prog-day-2" style="width:0%"></div></div>
+    <div class="day-body">
+      <div class="activity" id="act-d2-0" onclick="toggleActivity('d2-0')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">09:30</div>
+          <div class="activity-name">Tube to Westminster</div>
+          <div class="activity-detail">District or Circle line</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d2-1" onclick="toggleActivity('d2-1')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">09:45</div>
+          <div class="activity-name">Big Ben</div>
+          <div class="activity-detail">View from Westminster Bridge. The iconic 96-metre Elizabeth Tower has been keeping time since 1859. Best photos from the middle of Westminster Bridge looking north. Free to admire from outside.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d2-2" onclick="toggleActivity('d2-2')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">10:15</div>
+          <div class="activity-name">London Eye Walk</div>
+          <div class="activity-detail">Stroll along the South Bank. Europe's tallest cantilevered observation wheel at 135m. A ride takes 30 min and tickets cost ~£32. Even if you skip the ride, the South Bank walk has stunning Parliament views.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d2-3" onclick="toggleActivity('d2-3')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">10:45</div>
+          <div class="activity-name">Westminster Abbey</div>
+          <div class="activity-detail">Gothic masterpiece where every British monarch has been crowned since 1066. Entry is ~£27 if you want to go inside. The exterior and grounds are stunning for photos even without a ticket.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d2-4" onclick="toggleActivity('d2-4')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">11:15</div>
+          <div class="activity-name">St James's Park & Buckingham Palace</div>
+          <div class="activity-detail">London's oldest Royal Park with pelicans and lake views. Walk through to reach Buckingham Palace — the Changing of the Guard happens at 11:00 on select days (check the schedule). Free to view from the gates.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d2-5" onclick="toggleActivity('d2-5')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">12:45</div>
+          <div class="activity-name">Lunch · Dishoom Covent Garden</div>
+          <div class="activity-detail">12 Upper St Martin's Lane. Bombay-inspired cafe beloved by Londoners — try the black daal and bacon naan roll. Expect queues at peak times; your booking avoids the wait. Mains around £12–18.</div>
+          <div class="booked-badge">✓ BOOKED</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d2-6" onclick="toggleActivity('d2-6')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">14:15</div>
+          <div class="activity-name">Covent Garden Area</div>
+          <div class="activity-detail">Piazza · Apple Market · Neal's Yard · Seven Dials. Free street performers in the Piazza, artisan stalls in the Apple Market, and the Instagram-famous colourful courtyard of Neal's Yard. Allow 1–2 hours to explore.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d2-7" onclick="toggleActivity('d2-7')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">18:45</div>
+          <div class="activity-name">Dinner · Hawksmoor Seven Dials</div>
+          <div class="activity-detail">11 Langley St, Covent Garden. Widely considered London's best steakhouse — the 35-day dry-aged ribeye is legendary. Expect to spend £50–70pp with drinks. The pre-theatre menu (until 18:30) is great value at ~£30.</div>
+          <div class="booked-badge">✓ BOOKED</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d2-8" onclick="toggleActivity('d2-8')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">21:00</div>
+          <div class="activity-name">Optional: Soho Drinks</div>
+          <div class="activity-detail">Explore Old Compton St or Carnaby area. Soho is London's buzzing nightlife hub — Old Compton St is the heart of the scene, packed with bars and restaurants. Carnaby St nearby has quirky independent shops and cocktail bars.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Day 3 -->
+  <div class="day-card" id="day-3">
+    <div class="day-header" onclick="toggleDay('day-3')">
+      <div class="day-header-left">
+        <div class="day-badge">Day 3 · Mon 6 Apr</div>
+      </div>
+      <div>
+        <div class="day-title">🔭 Science + Notting Hill</div>
+        <div class="day-subtitle">4 activities</div>
+      </div>
+      <div class="day-chevron">›</div>
+    </div>
+    <div class="day-progress-bar"><div class="day-progress-fill" id="prog-day-3" style="width:0%"></div></div>
+    <div class="day-body">
+      <div class="activity" id="act-d3-0" onclick="toggleActivity('d3-0')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">10:00</div>
+          <div class="activity-name">Natural History Museum or Science Museum</div>
+          <div class="activity-detail">Exhibition Road, South Kensington. Both are completely free! The Natural History Museum has the famous dinosaur gallery and stunning Romanesque architecture. The Science Museum has hands-on tech exhibits. Open 10:00–17:50.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d3-1" onclick="toggleActivity('d3-1')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">13:15</div>
+          <div class="activity-name">Lunch · Muriel's Kitchen</div>
+          <div class="activity-detail">36 Old Brompton Rd, South Kensington. Charming brunch-style cafe with a cosy interior. Known for their pancakes, eggs royale, and afternoon tea. Mains around £12–16, no reservation needed.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d3-2" onclick="toggleActivity('d3-2')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">14:30</div>
+          <div class="activity-name">Portobello Road Market</div>
+          <div class="activity-detail">Lancaster Road colourful houses. World-famous antique and street food market stretching over a mile through Notting Hill. Note: visiting on Monday means the antique stalls will be closed (Saturday is the main day), but the permanent shops, cafes and colourful houses along Lancaster Road are still worth the visit.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d3-3" onclick="toggleActivity('d3-3')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">19:00</div>
+          <div class="activity-name">Dinner · The Ladbroke Arms</div>
+          <div class="activity-detail">54 Ladbroke Rd, Notting Hill. Award-winning gastropub with an upscale British menu — think slow-cooked lamb and seasonal fish. Cosy interior with a proper pub feel. Mains £18–28, booking recommended.</div>
+          <div class="booked-badge">✓ BOOKED</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Day 4 -->
+  <div class="day-card" id="day-4">
+    <div class="day-header" onclick="toggleDay('day-4')">
+      <div class="day-header-left">
+        <div class="day-badge">Day 4 · Tue 7 Apr</div>
+      </div>
+      <div>
+        <div class="day-title">🏰 Tower + Borough + Skyline</div>
+        <div class="day-subtitle">7 activities</div>
+      </div>
+      <div class="day-chevron">›</div>
+    </div>
+    <div class="day-progress-bar"><div class="day-progress-fill" id="prog-day-4" style="width:0%"></div></div>
+    <div class="day-body">
+      <div class="activity" id="act-d4-0" onclick="toggleActivity('d4-0')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">09:00</div>
+          <div class="activity-name">Tower of London · Crown Jewels</div>
+          <div class="activity-detail">Tower Hill, EC3N 4AB. Nearly 1,000-year-old fortress housing the Crown Jewels, the famous ravens, and centuries of royal history. Tickets ~£33, open 09:00–17:30. Head to the Jewel House first to beat the crowds.</div>
+          <div class="booked-badge">✓ BOOKED</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d4-1" onclick="toggleActivity('d4-1')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">11:15</div>
+          <div class="activity-name">Tower Bridge</div>
+          <div class="activity-detail">Walk across + views of the Thames. London's most famous bridge with its iconic Victorian Gothic towers. Walking across is free. The Glass Floor Exhibition up top costs ~£12 and offers a thrilling see-through view down to the river.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d4-2" onclick="toggleActivity('d4-2')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">12:30</div>
+          <div class="activity-name">Lunch · Borough Market</div>
+          <div class="activity-detail">8 Southwark St, SE1 1TL. London's oldest food market (1,000+ years!). Packed with artisan stalls — try the raclette, scotch eggs, or padella pasta. Open Wed–Sat. Come hungry and graze from stall to stall, ~£10–15 for a great meal.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d4-3" onclick="toggleActivity('d4-3')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">13:45</div>
+          <div class="activity-name">Thames Path Walk</div>
+          <div class="activity-detail">Millennium Bridge · St Paul's Cathedral view. The pedestrian-only steel suspension bridge offers one of London's best views — St Paul's dome framed perfectly at the end. Completely free, and a great photo spot.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d4-4" onclick="toggleActivity('d4-4')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">16:30</div>
+          <div class="activity-name">Rest at Hotel</div>
+          <div class="activity-detail">Freshen up before evening</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d4-5" onclick="toggleActivity('d4-5')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">19:30</div>
+          <div class="activity-name">Sky Garden</div>
+          <div class="activity-detail">1 Sky Garden Walk, EC3M 8AF. London's highest public garden on floors 35–37 of the "Walkie Talkie" building. Entry is free but you must book a slot in advance. 360° panoramic views of the city skyline, plus bars and restaurants.</div>
+          <div class="booked-badge">✓ BOOKED</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d4-6" onclick="toggleActivity('d4-6')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">21:00</div>
+          <div class="activity-name">Dinner · Bleecker Burger</div>
+          <div class="activity-detail">Bloomberg Arcade, City of London. Cult-favourite smash burgers — their dry-aged beef patties are simple and perfect. Burgers £9–13, no booking needed. The Bloomberg Arcade location is sleek and usually less crowded than others.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Day 5 -->
+  <div class="day-card" id="day-5">
+    <div class="day-header" onclick="toggleDay('day-5')">
+      <div class="day-header-left">
+        <div class="day-badge">Day 5 · Wed 8 Apr</div>
+      </div>
+      <div>
+        <div class="day-title">🚂 King's Cross + Cabaret</div>
+        <div class="day-subtitle">4 activities</div>
+      </div>
+      <div class="day-chevron">›</div>
+    </div>
+    <div class="day-progress-bar"><div class="day-progress-fill" id="prog-day-5" style="width:0%"></div></div>
+    <div class="day-body">
+      <div class="activity" id="act-d5-0" onclick="toggleActivity('d5-0')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">10:00</div>
+          <div class="activity-name">King's Cross Platform 9¾</div>
+          <div class="activity-detail">King's Cross Station. The Harry Potter photo op with a trolley disappearing into the wall — there's a dedicated shop next to it. Free to take photos but expect a 15–30 min queue. Coal Drops Yard nearby has stylish shops and cafes in a converted Victorian coal store.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d5-1" onclick="toggleActivity('d5-1')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">13:00</div>
+          <div class="activity-name">Lunch · Circolo Popolare</div>
+          <div class="activity-detail">40-41 Rathbone Pl, Fitzrovia W1T. Stunning Italian restaurant with walls covered in thousands of bottles — one of London's most Instagrammed interiors. Big sharing plates of pasta and pizza, mains £14–22. Booking essential.</div>
+          <div class="booked-badge">✓ BOOKED</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d5-2" onclick="toggleActivity('d5-2')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">14:45</div>
+          <div class="activity-name">Regent's Park or Soho</div>
+          <div class="activity-detail">Afternoon leisure — your pick. Regent's Park is 395 acres of gorgeous gardens, a boating lake, and London Zoo. Free entry, open from 05:00 to dusk. Or head to Soho for vintage shopping, record stores, and people-watching.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d5-3" onclick="toggleActivity('d5-3')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">19:00</div>
+          <div class="activity-name">The London Cabaret Club</div>
+          <div class="activity-detail">Dinner show at the Bloomsbury Ballroom. A glamorous evening of live cabaret, burlesque, and a 3-course dinner in a stunning 1930s Art Deco ballroom. Smart dress code — no trainers or sportswear. Show starts at 19:00.</div>
+          <div class="booked-badge">✓ BOOKED</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Day 6 -->
+  <div class="day-card" id="day-6">
+    <div class="day-header" onclick="toggleDay('day-6')">
+      <div class="day-header-left">
+        <div class="day-badge">Day 6 · Thu 9 Apr</div>
+      </div>
+      <div>
+        <div class="day-title">🛫 Departure Day</div>
+        <div class="day-subtitle">Battersea → Airport</div>
+      </div>
+      <div class="day-chevron">›</div>
+    </div>
+    <div class="day-progress-bar"><div class="day-progress-fill" id="prog-day-6" style="width:0%"></div></div>
+    <div class="day-body">
+      <div class="activity" id="act-d6-0" onclick="toggleActivity('d6-0')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">09:30</div>
+          <div class="activity-name">Breakfast at Hotel</div>
+          <div class="activity-detail">Staybridge Suites Vauxhall</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d6-1" onclick="toggleActivity('d6-1')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">11:00</div>
+          <div class="activity-name">Battersea Power Station</div>
+          <div class="activity-detail">London's iconic Art Deco power station, now a shopping and dining destination with over 100 shops. Ride the glass elevator up the chimney (Lift 109, ~£16) for 360° views of London. Open 10:00–21:00.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d6-2" onclick="toggleActivity('d6-2')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">12:30</div>
+          <div class="activity-name">Lunch · Where The Pancakes Are</div>
+          <div class="activity-detail">85a Battersea Rise. Dutch-style pancake house with both sweet and savoury options — the bacon and maple is a crowd favourite. Relaxed vibe, mains around £10–14. Walk-ins welcome, rarely a long wait.</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d6-3" onclick="toggleActivity('d6-3')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">14:30</div>
+          <div class="activity-name">Pack & Check Out</div>
+          <div class="activity-detail">Double-check luggage</div>
+        </div>
+      </div>
+      <div class="activity" id="act-d6-4" onclick="toggleActivity('d6-4')">
+        <div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="activity-content">
+          <div class="activity-time">16:30</div>
+          <div class="activity-name">Leave for Airport</div>
+          <div class="activity-detail">Head to Stansted</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════ SCREEN: MAP ══════════════════ -->
+<div class="screen" id="screen-map">
+  <div id="map"></div>
+  <div class="map-toolbar">
+    <div class="map-tool-btn" id="btn-fit-all" title="Fit all pins" onclick="mapFitAll()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+    </div>
+    <div class="map-tool-btn" id="btn-routes" title="Toggle walking routes" onclick="mapToggleRoutes()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+    </div>
+    <div class="map-tool-btn" id="btn-hotel" title="Go to hotel" onclick="mapGoHotel()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    </div>
+    <div class="map-tool-btn" id="btn-locate" title="My location" onclick="mapLocateMe()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+    </div>
+  </div>
+  <div class="map-legend">
+    <div class="legend-item" data-day="day1" onclick="mapToggleDay('day1')"><div class="legend-dot" style="background:#9e9e9e"></div>Day 1</div>
+    <div class="legend-item" data-day="day2" onclick="mapToggleDay('day2')"><div class="legend-dot" style="background:#4a9eff"></div>Day 2</div>
+    <div class="legend-item" data-day="day3" onclick="mapToggleDay('day3')"><div class="legend-dot" style="background:#4caf7d"></div>Day 3</div>
+    <div class="legend-item" data-day="day4" onclick="mapToggleDay('day4')"><div class="legend-dot" style="background:#ff9800"></div>Day 4</div>
+    <div class="legend-item" data-day="day5" onclick="mapToggleDay('day5')"><div class="legend-dot" style="background:#ab47bc"></div>Day 5</div>
+    <div class="legend-item" data-day="day6" onclick="mapToggleDay('day6')"><div class="legend-dot" style="background:#ec407a"></div>Day 6</div>
+  </div>
+</div>
+
+<!-- ══════════════════ SCREEN: WEATHER ══════════════════ -->
+<div class="screen" id="screen-weather">
+  <div id="weather-content">
+    <div class="loading-wrap"><div class="spinner"></div>Loading weather forecast...</div>
+  </div>
+</div>
+
+<!-- ══════════════════ SCREEN: CURRENCY ══════════════════ -->
+<div class="screen" id="screen-currency">
+
+  <div class="currency-hero">
+    <div class="rate-display">Live Exchange Rate</div>
+    <div class="rate-big">£1 = €<span id="rate-display-val">...</span></div>
+    <div class="rate-updated" id="rate-updated-text">Loading live rate...</div>
+  </div>
+
+  <div class="converter-card">
+    <div class="input-group">
+      <div class="input-label">You pay in GBP</div>
+      <div class="flag-input-row">
+        <div class="flag-label">🇬🇧</div>
+        <input class="currency-input" id="gbp-input" type="number" placeholder="0" inputmode="decimal" oninput="convertGbpToEur()">
+      </div>
+    </div>
+    <div class="swap-btn" onclick="swapCurrencies()">⇅</div>
+    <div class="input-group">
+      <div class="input-label">That's in EUR</div>
+      <div class="flag-input-row">
+        <div class="flag-label">🇪🇺</div>
+        <input class="currency-input result" id="eur-input" type="number" placeholder="0" inputmode="decimal" oninput="convertEurToGbp()">
+      </div>
+    </div>
+  </div>
+
+  <div class="quick-btns">
+    <div class="quick-btn" onclick="setGbp(10)">
+      <div class="qb-eur">£10</div>
+      <div class="qb-gbp" id="q10">€—</div>
+    </div>
+    <div class="quick-btn" onclick="setGbp(25)">
+      <div class="qb-eur">£25</div>
+      <div class="qb-gbp" id="q25">€—</div>
+    </div>
+    <div class="quick-btn" onclick="setGbp(50)">
+      <div class="qb-eur">£50</div>
+      <div class="qb-gbp" id="q50">€—</div>
+    </div>
+    <div class="quick-btn" onclick="setGbp(100)">
+      <div class="qb-eur">£100</div>
+      <div class="qb-gbp" id="q100">€—</div>
+    </div>
+  </div>
+
+  <div class="rate-edit-row">
+    <div class="rate-edit-label">Edit exchange rate<br><span style="font-size:11px;color:var(--text-muted)">1 GBP = X EUR</span></div>
+    <input class="rate-edit-input" id="rate-input" type="number" value="0.8550" step="0.001" inputmode="decimal" oninput="updateRate()">
+  </div>
+
+  <div class="tip-cards">
+    <div class="tip-card">
+      <div class="tip-label">Dishoom lunch</div>
+      <div class="tip-val">~£25</div>
+      <div class="tip-sub" id="tip-dishoom">≈ €29 pp</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-label">Hawksmoor</div>
+      <div class="tip-val">~£65</div>
+      <div class="tip-sub" id="tip-hawksmoor">≈ €76 pp</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-label">Oyster Card</div>
+      <div class="tip-val">£5+</div>
+      <div class="tip-sub">+ fares (daily cap)</div>
+    </div>
+    <div class="tip-card">
+      <div class="tip-label">Coffee / pint</div>
+      <div class="tip-val">£4–7</div>
+      <div class="tip-sub" id="tip-coffee">≈ €5–8</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════ BOTTOM NAV ══════════════════ -->
+<nav class="nav">
+  <button class="nav-btn active" id="nav-itinerary" onclick="switchScreen('itinerary')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14" stroke-width="2.5"/><line x1="12" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="8" y2="18" stroke-width="2.5"/><line x1="12" y1="18" x2="16" y2="18"/>
+    </svg>
+    <span class="nav-label">Itinerary</span>
+  </button>
+  <button class="nav-btn" id="nav-map" onclick="switchScreen('map')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>
+    </svg>
+    <span class="nav-label">Map</span>
+  </button>
+  <button class="nav-btn" id="nav-weather" onclick="switchScreen('weather')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+    </svg>
+    <span class="nav-label">Weather</span>
+  </button>
+  <button class="nav-btn" id="nav-currency" onclick="switchScreen('currency')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+    </svg>
+    <span class="nav-label">Currency</span>
+  </button>
+</nav>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+window.onerror = function(msg, src, line, col, err) {
+  document.title = 'ERROR: ' + msg + ' (line ' + line + ')';
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:red;color:white;padding:12px;font-size:13px;font-family:monospace';
+  d.textContent = 'JS Error line ' + line + ': ' + msg;
+  document.body.appendChild(d);
+};
+</script>
+<script>
+// ── Screen Navigation ──
+let currentScreen = 'itinerary';
+let mapInitialized = false;
+
+function switchScreen(name) {
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('screen-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  currentScreen = name;
+  if (name === 'map') {
+    if (!mapInitialized) {
+      mapInitialized = true;
+      setTimeout(initMap, 100);
+    } else if (theMap) {
+      setTimeout(function() { theMap.invalidateSize(); }, 100);
+    }
+  }
+  if (name === 'weather') fetchWeather();
+  if (name === 'currency') fetchCurrencyRate();
+}
+
+// ── Day Collapse/Expand ──
+function toggleDay(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+// ── Activity Progress ──
+const dayActivities = {
+  'day-1': ['d1-0','d1-1','d1-2','d1-3'],
+  'day-2': ['d2-0','d2-1','d2-2','d2-3','d2-4','d2-5','d2-6','d2-7','d2-8'],
+  'day-3': ['d3-0','d3-1','d3-2','d3-3'],
+  'day-4': ['d4-0','d4-1','d4-2','d4-3','d4-4','d4-5','d4-6'],
+  'day-5': ['d5-0','d5-1','d5-2','d5-3'],
+  'day-6': ['d6-0','d6-1','d6-2','d6-3','d6-4'],
+};
+
+const STORAGE_KEY = 'london-trip-2026-progress';
+
+function loadProgress() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
+}
+
+function saveProgress(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function toggleActivity(id) {
+  const el = document.getElementById('act-' + id);
+  el.classList.toggle('done');
+  const prog = loadProgress();
+  if (el.classList.contains('done')) prog[id] = true;
+  else delete prog[id];
+  saveProgress(prog);
+  updateAllProgress();
+}
+
+function updateAllProgress() {
+  const prog = loadProgress();
+  let total = 0, done = 0;
+  Object.entries(dayActivities).forEach(([day, acts]) => {
+    const dayDone = acts.filter(id => prog[id]).length;
+    total += acts.length;
+    done += dayDone;
+    const pct = acts.length ? (dayDone / acts.length * 100) : 0;
+    const bar = document.getElementById('prog-' + day);
+    if (bar) bar.style.width = pct + '%';
+  });
+  const overall = total ? done / total : 0;
+  const circumference = 2 * Math.PI * 21;
+  const offset = circumference * (1 - overall);
+  const ring = document.getElementById('ring-fill');
+  if (ring) {
+    ring.style.strokeDashoffset = offset;
+  }
+  const pctEl = document.getElementById('pct-text');
+  if (pctEl) pctEl.textContent = Math.round(overall * 100) + '%';
+  const sub = document.getElementById('progress-sub');
+  if (sub) sub.textContent = done + ' of ' + total + ' activities done';
+}
+
+function applyStoredProgress() {
+  const prog = loadProgress();
+  Object.keys(prog).forEach(id => {
+    const el = document.getElementById('act-' + id);
+    if (el) el.classList.add('done');
+  });
+  updateAllProgress();
+}
+
+// ── Map ──
+const locations = [
+  // Day 1 — Arrival
+  { name: 'Stansted Airport', lat: 51.8860, lng: 0.2389, day: 'Day 1', cat: 'day1', addr: 'Stansted Airport, Bassingbourn Rd, Stansted CM24 1QW' },
+  { name: 'Liverpool Street Station', lat: 51.5178, lng: -0.0823, day: 'Day 1', cat: 'day1', addr: 'Liverpool Street, London EC2M 7QH' },
+  { name: 'Staybridge Suites Vauxhall', lat: 51.4860, lng: -0.1192, day: 'Day 1 · Hotel', cat: 'day1', addr: '100 Vauxhall Walk, London SE11 5EL' },
+  // Day 2 — Westminster + Covent Garden
+  { name: 'Big Ben / Westminster Bridge', lat: 51.5007, lng: -0.1246, day: 'Day 2', cat: 'day2', addr: 'Westminster Bridge, London SW1A 2JH' },
+  { name: 'London Eye', lat: 51.5033, lng: -0.1195, day: 'Day 2', cat: 'day2', addr: 'Riverside Building, County Hall, London SE1 7PB' },
+  { name: 'Westminster Abbey', lat: 51.4994, lng: -0.1273, day: 'Day 2', cat: 'day2', addr: '20 Deans Yd, London SW1P 3PA' },
+  { name: 'St James\'s Park', lat: 51.5025, lng: -0.1350, day: 'Day 2', cat: 'day2', addr: 'St James\'s Park, London SW1A 2BJ' },
+  { name: 'Buckingham Palace', lat: 51.5014, lng: -0.1419, day: 'Day 2', cat: 'day2', addr: 'Buckingham Palace, London SW1A 1AA' },
+  { name: 'Dishoom Covent Garden', lat: 51.5131, lng: -0.1231, day: 'Day 2 · Lunch', cat: 'day2', addr: '12 Upper St Martin\'s Ln, London WC2H 9FB' },
+  { name: 'Covent Garden Piazza', lat: 51.5117, lng: -0.1240, day: 'Day 2', cat: 'day2', addr: 'Covent Garden Piazza, London WC2E 8RF' },
+  { name: 'Neal\'s Yard', lat: 51.5148, lng: -0.1264, day: 'Day 2', cat: 'day2', addr: 'Neal\'s Yard, London WC2H 9DP' },
+  { name: 'Hawksmoor Seven Dials', lat: 51.5139, lng: -0.1272, day: 'Day 2 · Dinner', cat: 'day2', addr: '11 Langley St, London WC2H 9JG' },
+  { name: 'Soho / Old Compton St', lat: 51.5133, lng: -0.1314, day: 'Day 2 · Evening', cat: 'day2', addr: 'Old Compton St, Soho, London W1D' },
+  // Day 3 — Museums + Notting Hill
+  { name: 'Natural History Museum', lat: 51.4967, lng: -0.1764, day: 'Day 3', cat: 'day3', addr: 'Cromwell Rd, South Kensington, London SW7 5BD' },
+  { name: 'Science Museum', lat: 51.4978, lng: -0.1745, day: 'Day 3', cat: 'day3', addr: 'Exhibition Rd, South Kensington, London SW7 2DD' },
+  { name: 'Muriel\'s Kitchen', lat: 51.4961, lng: -0.1740, day: 'Day 3 · Lunch', cat: 'day3', addr: '36 Old Brompton Rd, South Kensington, London SW7 3DL' },
+  { name: 'Portobello Road Market', lat: 51.5157, lng: -0.2039, day: 'Day 3', cat: 'day3', addr: 'Portobello Rd, Notting Hill, London W11 1LJ' },
+  { name: 'The Ladbroke Arms', lat: 51.5117, lng: -0.2050, day: 'Day 3 · Dinner', cat: 'day3', addr: '54 Ladbroke Rd, London W11 3NW' },
+  // Day 4 — Tower + Borough + Skyline
+  { name: 'Tower of London', lat: 51.5081, lng: -0.0759, day: 'Day 4', cat: 'day4', addr: 'Tower of London, London EC3N 4AB' },
+  { name: 'Tower Bridge', lat: 51.5055, lng: -0.0754, day: 'Day 4', cat: 'day4', addr: 'Tower Bridge Rd, London SE1 2UP' },
+  { name: 'Borough Market', lat: 51.5055, lng: -0.0910, day: 'Day 4 · Lunch', cat: 'day4', addr: '8 Southwark St, London SE1 1TL' },
+  { name: 'Millennium Bridge', lat: 51.5095, lng: -0.0985, day: 'Day 4', cat: 'day4', addr: 'Millennium Bridge, London SE1 9JE' },
+  { name: 'St Paul\'s Cathedral', lat: 51.5138, lng: -0.0984, day: 'Day 4', cat: 'day4', addr: 'St Paul\'s Churchyard, London EC4M 8AD' },
+  { name: 'Sky Garden', lat: 51.5114, lng: -0.0837, day: 'Day 4 · Evening', cat: 'day4', addr: '20 Fenchurch St, London EC3M 3BY' },
+  { name: 'Bleecker Burger', lat: 51.5104, lng: -0.0869, day: 'Day 4 · Dinner', cat: 'day4', addr: 'Bloomberg Arcade, 3 Queen St, London EC4N 8BN' },
+  // Day 5 — King's Cross + Cabaret
+  { name: 'King\'s Cross Platform 9¾', lat: 51.5322, lng: -0.1234, day: 'Day 5', cat: 'day5', addr: 'King\'s Cross Station, Euston Rd, London N1 9AL' },
+  { name: 'Coal Drops Yard', lat: 51.5371, lng: -0.1229, day: 'Day 5', cat: 'day5', addr: 'Stable St, King\'s Cross, London N1C 4DQ' },
+  { name: 'Circolo Popolare', lat: 51.5159, lng: -0.1367, day: 'Day 5 · Lunch', cat: 'day5', addr: '40-41 Rathbone Pl, London W1T 1HX' },
+  { name: 'Regent\'s Park', lat: 51.5313, lng: -0.1570, day: 'Day 5', cat: 'day5', addr: 'Regent\'s Park, London NW1 4NR' },
+  { name: 'The London Cabaret Club', lat: 51.5090, lng: -0.1450, day: 'Day 5 · Evening', cat: 'day5', addr: 'The Bloomsbury Ballroom, Victoria House, Bloomsbury Sq, London WC1B 4DA' },
+  // Day 6 — Battersea + Departure
+  { name: 'Battersea Power Station', lat: 51.4826, lng: -0.1448, day: 'Day 6', cat: 'day6', addr: 'Battersea Power Station, Circus Rd W, Nine Elms, London SW11 8DD' },
+  { name: 'Where The Pancakes Are', lat: 51.4784, lng: -0.1503, day: 'Day 6 · Lunch', cat: 'day6', addr: '85a Battersea Rise, London SW11 1HN' },
+];
+
+const catColors = {
+  day1: '#9e9e9e',
+  day2: '#4a9eff',
+  day3: '#4caf7d',
+  day4: '#ff9800',
+  day5: '#ab47bc',
+  day6: '#ec407a',
+};
+
+function makePin(color) {
+  return L.divIcon({
+    className: '',
+    html: `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+      <path d="M14 0C6.27 0 0 6.27 0 14c0 9.63 12.57 21.06 13.12 21.57a1.25 1.25 0 0 0 1.76 0C15.43 35.06 28 23.63 28 14 28 6.27 21.73 0 14 0z" fill="${color}" opacity="0.95"/>
+      <circle cx="14" cy="14" r="6" fill="white" opacity="0.9"/>
+    </svg>`,
+    iconSize: [28, 36],
+    iconAnchor: [14, 36],
+    popupAnchor: [0, -38],
+  });
+}
+
+// Map state
+let theMap = null;
+const dayMarkers = {}; // { day1: [marker, ...], day2: [...], ... }
+const dayRoutes = {};  // { day1: polyline, ... }
+const dayVisible = { day1: true, day2: true, day3: true, day4: true, day5: true, day6: true };
+let routesVisible = false;
+let locationMarker = null;
+
+const catLabels = {
+  day1: 'Day 1', day2: 'Day 2', day3: 'Day 3',
+  day4: 'Day 4', day5: 'Day 5', day6: 'Day 6',
+};
+
+function initMap() {
+  try {
+  theMap = L.map('map', {
+    center: [51.505, -0.118],
+    zoom: 13,
+    zoomControl: false,
+    dragging: true,
+    touchZoom: true,
+    scrollWheelZoom: true,
+    doubleClickZoom: true,
+    boxZoom: true,
+    keyboard: true,
+    tap: true,
+  });
+
+  // Zoom control bottom-left to avoid toolbar
+  L.control.zoom({ position: 'topleft' }).addTo(theMap);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors, Tiles: Humanitarian OSM Team',
+    maxZoom: 19,
+  }).addTo(theMap);
+
+  // Create markers grouped by day
+  Object.keys(catColors).forEach(function(cat) { dayMarkers[cat] = []; });
+
+  locations.forEach(function(loc) {
+    var color = catColors[loc.cat];
+    var marker = L.marker([loc.lat, loc.lng], { icon: makePin(color) }).addTo(theMap);
+    var mapsUrl = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(loc.addr);
+    marker.bindPopup(
+      '<div class="popup-color-bar" style="background:' + color + '"></div>' +
+      '<div class="popup-body">' +
+        '<div class="popup-name">' + loc.name + '</div>' +
+        '<div class="popup-day" style="color:' + color + '">' + loc.day + '</div>' +
+        '<div class="popup-addr">' + loc.addr + '</div>' +
+        '<a class="popup-nav-btn" href="' + mapsUrl + '" target="_blank" rel="noopener">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>' +
+          'Navigate' +
+        '</a>' +
+      '</div>'
+    , { maxWidth: 280 });
+    dayMarkers[loc.cat].push(marker);
+  });
+
+  // Create walking route polylines per day (hidden by default)
+  Object.keys(catColors).forEach(function(cat) {
+    var pts = [];
+    locations.forEach(function(loc) {
+      if (loc.cat === cat) pts.push([loc.lat, loc.lng]);
+    });
+    if (pts.length > 1) {
+      dayRoutes[cat] = L.polyline(pts, {
+        color: catColors[cat],
+        weight: 3,
+        opacity: 0.7,
+        dashArray: '8, 8',
+        smoothFactor: 1,
+      });
+      // Not added to map yet — routes start hidden
+    }
+  });
+
+  // Fit to London pins (exclude Stansted outlier for initial view)
+  var londonPins = locations.filter(function(l) { return l.lat < 51.6; });
+  if (londonPins.length) {
+    var bounds = L.latLngBounds(londonPins.map(function(l) { return [l.lat, l.lng]; }));
+    theMap.fitBounds(bounds, { padding: [40, 40] });
+  }
+
+  // Auto-open the hotel pin
+  if (dayMarkers.day1 && dayMarkers.day1.length > 2) {
+    setTimeout(function() { dayMarkers.day1[2].openPopup(); }, 300);
+  }
+
+  setTimeout(function() { theMap.invalidateSize(); }, 100);
+  } catch(e) { console.error('Map init error:', e); }
+}
+
+// ── Map Controls ──
+function mapFitAll() {
+  if (!theMap) return;
+  var allBounds = L.latLngBounds(locations.map(function(l) { return [l.lat, l.lng]; }));
+  theMap.fitBounds(allBounds, { padding: [40, 40] });
+}
+
+function mapToggleDay(cat) {
+  if (!theMap) return;
+  dayVisible[cat] = !dayVisible[cat];
+  var legendEl = document.querySelector('.legend-item[data-day="' + cat + '"]');
+  if (legendEl) legendEl.classList.toggle('inactive', !dayVisible[cat]);
+
+  dayMarkers[cat].forEach(function(m) {
+    if (dayVisible[cat]) m.addTo(theMap);
+    else theMap.removeLayer(m);
+  });
+
+  if (dayRoutes[cat]) {
+    if (dayVisible[cat] && routesVisible) dayRoutes[cat].addTo(theMap);
+    else theMap.removeLayer(dayRoutes[cat]);
+  }
+
+  // Fit to visible pins
+  var visiblePts = [];
+  Object.keys(dayMarkers).forEach(function(d) {
+    if (dayVisible[d]) {
+      dayMarkers[d].forEach(function(m) { visiblePts.push(m.getLatLng()); });
+    }
+  });
+  if (visiblePts.length) {
+    theMap.fitBounds(L.latLngBounds(visiblePts), { padding: [40, 40], maxZoom: 15 });
+  }
+}
+
+function mapToggleRoutes() {
+  if (!theMap) return;
+  routesVisible = !routesVisible;
+  document.getElementById('btn-routes').classList.toggle('active', routesVisible);
+  Object.keys(dayRoutes).forEach(function(cat) {
+    if (routesVisible && dayVisible[cat]) dayRoutes[cat].addTo(theMap);
+    else theMap.removeLayer(dayRoutes[cat]);
+  });
+}
+
+function mapGoHotel() {
+  if (!theMap) return;
+  var hotel = locations.find(function(l) { return l.name === 'Staybridge Suites Vauxhall'; });
+  if (!hotel) return;
+  theMap.setView([hotel.lat, hotel.lng], 16);
+  if (dayMarkers.day1) {
+    dayMarkers.day1.forEach(function(m) {
+      if (m.getLatLng().lat === hotel.lat) m.openPopup();
+    });
+  }
+}
+
+function mapLocateMe() {
+  if (!theMap) return;
+  var btn = document.getElementById('btn-locate');
+  if (!navigator.geolocation) {
+    btn.style.opacity = '0.3';
+    return;
+  }
+  btn.classList.add('active');
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      var latlng = [pos.coords.latitude, pos.coords.longitude];
+      if (locationMarker) theMap.removeLayer(locationMarker);
+      locationMarker = L.circleMarker(latlng, {
+        radius: 8, fillColor: '#2563eb', fillOpacity: 1,
+        color: 'white', weight: 3, opacity: 1,
+      }).addTo(theMap);
+      locationMarker.bindPopup('<div style="font-weight:600;font-size:13px;padding:4px">You are here</div>').openPopup();
+      theMap.setView(latlng, 15);
+      btn.classList.remove('active');
+    },
+    function(err) {
+      btn.classList.remove('active');
+      // Show inline message instead of alert
+      var msg = document.createElement('div');
+      msg.style.cssText = 'position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:1200;background:white;border:1px solid #e5e7ee;border-radius:12px;padding:12px 18px;font-size:13px;color:#1a1a2e;box-shadow:0 4px 12px rgba(0,0,0,0.1);text-align:center;max-width:280px';
+      msg.innerHTML = '<strong>Location unavailable</strong><br><span style="color:#64748b;font-size:12px">Open in Chrome at http://127.0.0.1:5500 for GPS support, or use during the trip on your phone.</span>';
+      document.getElementById('screen-map').appendChild(msg);
+      setTimeout(function() { msg.remove(); }, 5000);
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+// ── Weather API ──
+const WMO_ICONS = {
+  0:'☀️', 1:'🌤️', 2:'⛅', 3:'☁️',
+  45:'🌫️', 48:'🌫️',
+  51:'🌦️', 53:'🌦️', 55:'🌧️',
+  56:'🌧️', 57:'🌧️',
+  61:'🌦️', 63:'🌧️', 65:'🌧️',
+  66:'🌧️', 67:'🌧️',
+  71:'🌨️', 73:'🌨️', 75:'❄️',
+  77:'🌨️',
+  80:'🌦️', 81:'🌧️', 82:'⛈️',
+  85:'🌨️', 86:'🌨️',
+  95:'⛈️', 96:'⛈️', 99:'⛈️',
+};
+const WMO_DESC = {
+  0:'Clear sky', 1:'Mainly clear', 2:'Partly cloudy', 3:'Overcast',
+  45:'Foggy', 48:'Rime fog',
+  51:'Light drizzle', 53:'Moderate drizzle', 55:'Dense drizzle',
+  56:'Freezing drizzle', 57:'Freezing drizzle',
+  61:'Light rain', 63:'Moderate rain', 65:'Heavy rain',
+  66:'Freezing rain', 67:'Freezing rain',
+  71:'Light snow', 73:'Moderate snow', 75:'Heavy snow',
+  77:'Snow grains',
+  80:'Light showers', 81:'Moderate showers', 82:'Heavy showers',
+  85:'Snow showers', 86:'Heavy snow showers',
+  95:'Thunderstorm', 96:'Thunderstorm with hail', 99:'Severe thunderstorm',
+};
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function fetchWeather() {
+  const container = document.getElementById('weather-content');
+  container.innerHTML = '<div class="loading-wrap"><div class="spinner"></div>Loading weather forecast...</div>';
+
+  const url = 'https://api.open-meteo.com/v1/forecast?latitude=51.5074&longitude=-0.1278'
+    + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,sunrise,sunset'
+    + '&start_date=2026-04-04&end_date=2026-04-09&timezone=Europe/London';
+
+  fetch(url)
+    .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+    .then(data => {
+      const d = data.daily;
+      if (!d || !d.time || !d.time.length) throw new Error('No data');
+
+      // Hero — use first day as summary
+      const firstCode = d.weather_code[0];
+      const heroIcon = WMO_ICONS[firstCode] || '🌤️';
+      const avgHi = Math.round(d.temperature_2m_max.reduce((a,b)=>a+b,0) / d.temperature_2m_max.length);
+      const avgLo = Math.round(d.temperature_2m_min.reduce((a,b)=>a+b,0) / d.temperature_2m_min.length);
+
+      let html = `
+        <div class="weather-hero">
+          <div class="weather-city">London, United Kingdom</div>
+          <div class="weather-icon">${heroIcon}</div>
+          <div class="weather-temp">${Math.round(d.temperature_2m_max[0])}°</div>
+          <div class="weather-desc">${WMO_DESC[firstCode] || 'Unknown'}</div>
+          <div class="weather-range">Trip average · H: ${avgHi}° · L: ${avgLo}°</div>
+          <div class="weather-range" style="margin-top:6px;font-size:11px">Updated ${new Date().toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })} · Open-Meteo</div>
+        </div>
+        <div class="forecast-row">`;
+
+      d.time.forEach((date, i) => {
+        const dt = new Date(date + 'T00:00:00');
+        const dayName = DAY_NAMES[dt.getDay()];
+        const dayNum = dt.getDate();
+        const code = d.weather_code[i];
+        const icon = WMO_ICONS[code] || '🌤️';
+        const desc = WMO_DESC[code] || 'Unknown';
+        const hi = Math.round(d.temperature_2m_max[i]);
+        const lo = Math.round(d.temperature_2m_min[i]);
+        const rain = d.precipitation_probability_max[i];
+        const rainTxt = rain > 0 ? ` · ${rain}% rain` : '';
+
+        html += `
+          <div class="forecast-item">
+            <div>
+              <div class="forecast-day">${dayName}</div>
+              <div class="forecast-date">${dayNum} Apr</div>
+            </div>
+            <div class="forecast-icon">${icon}</div>
+            <div class="forecast-desc">${desc}${rainTxt}</div>
+            <div class="forecast-temps">
+              <div class="forecast-hi">${hi}°</div>
+              <div class="forecast-lo">${lo}°</div>
+            </div>
+          </div>`;
+      });
+      html += '</div>';
+
+      // Detail cards — use first day data
+      const wind = Math.round(d.wind_speed_10m_max[0]);
+      const sunrise = d.sunrise[0] ? d.sunrise[0].split('T')[1] : '—';
+      const sunset = d.sunset[0] ? d.sunset[0].split('T')[1] : '—';
+
+      // Find best day (highest temp)
+      let bestIdx = 0;
+      d.temperature_2m_max.forEach((t, i) => { if (t > d.temperature_2m_max[bestIdx]) bestIdx = i; });
+      const bestDt = new Date(d.time[bestIdx] + 'T00:00:00');
+      const bestDayName = DAY_NAMES[bestDt.getDay()];
+
+      html += `
+        <div class="weather-detail-grid">
+          <div class="weather-detail-card">
+            <div class="weather-detail-label">Wind</div>
+            <div class="weather-detail-val">${wind} km/h</div>
+            <div class="weather-detail-sub">Max gust Day 1</div>
+          </div>
+          <div class="weather-detail-card">
+            <div class="weather-detail-label">Best Day</div>
+            <div class="weather-detail-val">${bestDayName} ${bestDt.getDate()}</div>
+            <div class="weather-detail-sub">${Math.round(d.temperature_2m_max[bestIdx])}° — warmest</div>
+          </div>
+          <div class="weather-detail-card">
+            <div class="weather-detail-label">Sunrise</div>
+            <div class="weather-detail-val">${sunrise}</div>
+            <div class="weather-detail-sub">BST (UTC+1)</div>
+          </div>
+          <div class="weather-detail-card">
+            <div class="weather-detail-label">Sunset</div>
+            <div class="weather-detail-val">${sunset}</div>
+            <div class="weather-detail-sub">Long evenings</div>
+          </div>
+        </div>
+        <div class="weather-note">
+          🌂 <strong>Pack tip:</strong> April in London is unpredictable — bring a light waterproof jacket and layers. ${bestDayName} looks like your best outdoor day!
+        </div>
+`;
+
+
+      container.innerHTML = html;
+    })
+    .catch(err => {
+      container.innerHTML = `
+        <div class="weather-hero">
+          <div class="weather-city">London, United Kingdom</div>
+          <div class="weather-icon">⛅</div>
+          <div class="weather-temp">13°</div>
+          <div class="weather-desc">Forecast unavailable</div>
+          <div class="weather-range">Could not load live data — showing April averages</div>
+        </div>
+        <div class="weather-note">
+          ⚠️ Unable to fetch live weather: ${err.message}. Check your connection and try again.
+        </div>`;
+    });
+}
+
+// ── Currency API ──
+// rate = how many EUR per 1 GBP
+let rate = 1.1696;
+let gbpMode = true;
+
+function fetchCurrencyRate() {
+  const rateEl = document.getElementById('rate-display-val');
+  const updatedEl = document.getElementById('rate-updated-text');
+  const rateInput = document.getElementById('rate-input');
+
+  fetch('https://api.frankfurter.app/latest?from=GBP&to=EUR')
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(data) {
+      if (!data.rates || !data.rates.EUR) throw new Error('Unexpected response');
+      rate = data.rates.EUR;
+      if (rateEl) rateEl.textContent = rate.toFixed(4);
+      if (rateInput) rateInput.value = rate.toFixed(4);
+      updateQuickBtns();
+      if (gbpMode) convertGbpToEur(); else convertEurToGbp();
+      var now = new Date();
+      var timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      var dateStr = data.date || now.toLocaleDateString('en-GB');
+      if (updatedEl) updatedEl.textContent = 'ECB rate from ' + dateStr + ' · Updated at ' + timeStr;
+    })
+    .catch(function(err) {
+      if (rateEl) rateEl.textContent = rate.toFixed(4);
+      if (updatedEl) updatedEl.textContent = 'Could not fetch live rate — using fallback';
+    });
+}
+
+function updateRate() {
+  const val = parseFloat(document.getElementById('rate-input').value);
+  if (!isNaN(val) && val > 0) {
+    rate = val;
+    document.getElementById('rate-display-val').textContent = rate.toFixed(4);
+    updateQuickBtns();
+    if (gbpMode) convertGbpToEur(); else convertEurToGbp();
+  }
+}
+
+function updateQuickBtns() {
+  [10,25,50,100].forEach(amt => {
+    const el = document.getElementById('q'+amt);
+    if (el) el.textContent = '€' + (amt * rate).toFixed(2);
+  });
+  const td = document.getElementById('tip-dishoom');
+  const th = document.getElementById('tip-hawksmoor');
+  const tc = document.getElementById('tip-coffee');
+  if (td) td.textContent = '≈ €' + Math.round(25 * rate) + ' pp';
+  if (th) th.textContent = '≈ €' + Math.round(65 * rate) + ' pp';
+  if (tc) tc.textContent = '≈ €' + Math.round(4 * rate) + '–' + Math.round(7 * rate);
+}
+
+function convertGbpToEur() {
+  gbpMode = true;
+  const gbp = parseFloat(document.getElementById('gbp-input').value);
+  document.getElementById('eur-input').value = isNaN(gbp) ? '' : (gbp * rate).toFixed(2);
+}
+
+function convertEurToGbp() {
+  gbpMode = false;
+  const eur = parseFloat(document.getElementById('eur-input').value);
+  document.getElementById('gbp-input').value = isNaN(eur) ? '' : (eur / rate).toFixed(2);
+}
+
+function setGbp(amt) {
+  document.getElementById('gbp-input').value = amt;
+  convertGbpToEur();
+  gbpMode = true;
+}
+
+function swapCurrencies() {
+  const gbp = document.getElementById('gbp-input').value;
+  const eur = document.getElementById('eur-input').value;
+  document.getElementById('gbp-input').value = eur;
+  document.getElementById('eur-input').value = gbp;
+  gbpMode = !gbpMode;
+  if (gbpMode) convertGbpToEur(); else convertEurToGbp();
+}
+
+// ── Activity Links (Wikipedia + Google Maps) ──
+const WIKI_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M14.97 18.95L12 12.78l-2.97 6.17c-.39.81-.78.81-1.17 0L3.14 6.78c-.21-.47-.49-.72-.84-.75L1 5.95V5h5v.95l-1.03.05c-.42.02-.56.17-.42.46l3.88 8.5 1.98-4.12L8.97 8.2c-.34-.68-.62-1.05-.84-1.11l-.84-.14V6h4.5v.95c-.56.02-.78.15-.66.39l1.65 3.37 1.56-3.2c.12-.28.07-.46-.16-.52l-.72-.09V6h3.3v.95c-.62.05-1.07.32-1.35.81l-2.3 4.67 2.4 4.88 3.77-8.41c.16-.39.16-.6 0-.64l-.96-.09V6.95h4.3V6h.01v.95l-.95.12c-.39.05-.72.36-1 .93l-5.07 10.95c-.39.81-.78.81-1.17 0z"/></svg>';
+const MAPS_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/></svg>';
+
+const activityLinks = {
+  'd1-0': { wiki: 'London_Stansted_Airport', maps: 'London Stansted Airport' },
+  'd1-1': { wiki: 'Stansted_Express', maps: 'Liverpool Street Station, London' },
+  'd1-3': { maps: 'Staybridge Suites London Vauxhall' },
+  'd2-1': { wiki: 'Big_Ben', maps: 'Big Ben, London' },
+  'd2-2': { wiki: 'London_Eye', maps: 'London Eye' },
+  'd2-3': { wiki: 'Westminster_Abbey', maps: 'Westminster Abbey, London' },
+  'd2-4': { wiki: 'Buckingham_Palace', maps: 'Buckingham Palace, London' },
+  'd2-5': { wiki: 'Dishoom', maps: 'Dishoom Covent Garden, London' },
+  'd2-6': { wiki: 'Covent_Garden', maps: 'Covent Garden, London' },
+  'd2-7': { wiki: 'Hawksmoor_(restaurant)', maps: 'Hawksmoor Seven Dials, London' },
+  'd2-8': { wiki: 'Soho', maps: 'Old Compton Street, London' },
+  'd3-0': { wiki: 'Natural_History_Museum,_London', maps: 'Natural History Museum, London' },
+  'd3-1': { maps: "Muriel's Kitchen, South Kensington, London" },
+  'd3-2': { wiki: 'Portobello_Road', maps: 'Portobello Road Market, London' },
+  'd3-3': { maps: 'The Ladbroke Arms, London' },
+  'd4-0': { wiki: 'Tower_of_London', maps: 'Tower of London' },
+  'd4-1': { wiki: 'Tower_Bridge', maps: 'Tower Bridge, London' },
+  'd4-2': { wiki: 'Borough_Market', maps: 'Borough Market, London' },
+  'd4-3': { wiki: 'Millennium_Bridge,_London', maps: 'Millennium Bridge, London' },
+  'd4-5': { wiki: 'Sky_Garden', maps: '20 Fenchurch St, London' },
+  'd4-6': { maps: 'Bleecker Burger, Bloomberg Arcade, London' },
+  'd5-0': { wiki: "King%27s_Cross_station#Platform_9%C2%BE", maps: "King's Cross Station, London" },
+  'd5-1': { wiki: 'Circolo_Popolare', maps: 'Circolo Popolare, London' },
+  'd5-2': { wiki: "Regent%27s_Park", maps: "Regent's Park, London" },
+  'd5-3': { maps: 'The London Cabaret Club' },
+  'd6-1': { wiki: 'Battersea_Power_Station', maps: 'Battersea Power Station, London' },
+  'd6-2': { maps: 'Where The Pancakes Are, Battersea, London' },
+};
+
+function injectActivityLinks() {
+  Object.entries(activityLinks).forEach(([id, links]) => {
+    const el = document.getElementById('act-' + id);
+    if (!el) return;
+    const content = el.querySelector('.activity-content');
+    if (!content) return;
+    const div = document.createElement('div');
+    div.className = 'activity-links';
+    if (links.wiki) {
+      div.innerHTML += `<a class="activity-link activity-link--wiki" href="https://en.wikipedia.org/wiki/${links.wiki}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${WIKI_ICON} Wiki</a>`;
+    }
+    if (links.maps) {
+      div.innerHTML += `<a class="activity-link activity-link--maps" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(links.maps)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${MAPS_ICON} Maps</a>`;
+    }
+    content.appendChild(div);
+  });
+}
+
+// ── Init ──
+applyStoredProgress();
+updateQuickBtns();
+fetchCurrencyRate();
+injectActivityLinks();
+
+// ── PWA Service Worker ──
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(function() {});
+}
+</script>
+</body>
+</html>
