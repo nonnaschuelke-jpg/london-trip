@@ -1386,6 +1386,8 @@ function initMap() {
   }
 
   setTimeout(function() { theMap.invalidateSize(); }, 100);
+  // Add pins for user-added activities
+  setTimeout(syncAllCustomPins, 500);
   } catch(e) { console.error('Map init error:', e); }
 }
 
@@ -1974,6 +1976,8 @@ function saveModal() {
       content.insertAdjacentHTML('beforeend', buildLinksHtml(maps, wiki));
     }
     persistEdit(act.id, timeDisplay, name, detail, null, maps, wiki);
+    // Sync map pin
+    if (maps) addPinForActivity(act.id, name, maps);
   } else if (editTarget && editTarget.newDay) {
     // Adding new
     var dayBody = document.querySelector('#' + editTarget.newDay + ' .day-body');
@@ -2006,6 +2010,8 @@ function saveModal() {
     dayActivities[dayKey].push(newId);
     updateAllProgress();
     persistEdit('act-' + newId, timeDisplay, name, detail, editTarget.newDay, maps, wiki);
+    // Add map pin
+    if (maps) addPinForActivity('act-' + newId, name, maps);
   }
   closeModal();
 }
@@ -2033,6 +2039,8 @@ function deleteActivity(actEl) {
     var edits = loadEdits();
     edits[actEl.id] = { deleted: true };
     saveEdits(edits);
+    // Remove map pin
+    removePinForActivity(actEl.id);
   }, 220);
 }
 
@@ -2041,6 +2049,66 @@ function persistEdit(actId, time, name, detail, newDay, maps, wiki) {
   edits[actId] = { time: time, name: name, detail: detail, maps: maps || '', wiki: wiki || '' };
   if (newDay) edits[actId].newDay = newDay;
   saveEdits(edits);
+}
+
+// ── Map Sync ──
+var customPins = {}; // actId -> L.marker
+
+function dayFromActId(actId) {
+  // 'act-d3-2' -> 'day3'
+  var m = actId.match(/act-d(\d+)/);
+  return m ? 'day' + m[1] : 'day1';
+}
+
+function addPinForActivity(actId, name, maps, dayLabel) {
+  if (!theMap || !maps) return;
+  // Remove old pin if exists
+  removePinForActivity(actId);
+  // Geocode via Nominatim
+  var query = maps;
+  fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(query) + '&format=json&limit=1')
+    .then(function(r) { return r.json(); })
+    .then(function(results) {
+      if (!results || !results.length) return;
+      var lat = parseFloat(results[0].lat);
+      var lng = parseFloat(results[0].lon);
+      var cat = dayFromActId(actId);
+      var color = catColors[cat] || '#4a9eff';
+      var marker = L.marker([lat, lng], { icon: makePin(color) }).addTo(theMap);
+      var mapsUrl = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(maps);
+      marker.bindPopup(
+        '<div class="popup-color-bar" style="background:' + color + '"></div>' +
+        '<div class="popup-body">' +
+          '<div class="popup-name">' + name + '</div>' +
+          '<div class="popup-day" style="color:' + color + '">' + (dayLabel || cat) + '</div>' +
+          '<div class="popup-addr">' + maps + '</div>' +
+          '<a class="popup-nav-btn" href="' + mapsUrl + '" target="_blank" rel="noopener">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>' +
+            'Navigate' +
+          '</a>' +
+        '</div>'
+      , { maxWidth: 280 });
+      customPins[actId] = marker;
+    })
+    .catch(function() {});
+}
+
+function removePinForActivity(actId) {
+  if (customPins[actId] && theMap) {
+    theMap.removeLayer(customPins[actId]);
+    delete customPins[actId];
+  }
+}
+
+function syncAllCustomPins() {
+  var edits = loadEdits();
+  Object.keys(edits).forEach(function(actId) {
+    var edit = edits[actId];
+    if (edit.deleted || !edit.maps) return;
+    if (edit.newDay) {
+      addPinForActivity(actId, edit.name, edit.maps);
+    }
+  });
 }
 
 function applyStoredEdits() {
