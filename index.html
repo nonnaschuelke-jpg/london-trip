@@ -460,6 +460,66 @@
   .screen::-webkit-scrollbar-track { background: transparent; }
   .screen::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
+  /* ── Edit Mode ── */
+  .edit-btn {
+    background: none; border: 1.5px solid rgba(255,255,255,0.3); color: rgba(255,255,255,0.8);
+    border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all .15s; letter-spacing: 0.3px;
+  }
+  .edit-btn.active { background: white; color: var(--navy); border-color: white; }
+  .activity-actions {
+    display: none; flex-shrink: 0; gap: 4px; margin-left: auto; align-items: center;
+  }
+  body.edit-mode .activity-actions { display: flex; }
+  body.edit-mode .activity-check { display: none; }
+  body.edit-mode .activity { cursor: default; }
+  .act-btn {
+    width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text-muted); display: flex; align-items: center;
+    justify-content: center; cursor: pointer; transition: all .15s; font-size: 14px;
+  }
+  .act-btn:active { background: var(--border-light); }
+  .act-btn--del:active { background: #fee2e2; color: #ef4444; border-color: #fca5a5; }
+  .add-activity-btn {
+    display: none; border: 1.5px dashed var(--border); border-radius: 12px;
+    padding: 12px; text-align: center; color: var(--accent); font-size: 13px;
+    font-weight: 600; cursor: pointer; margin: 8px 16px 12px; background: var(--accent-soft);
+    transition: all .15s;
+  }
+  .add-activity-btn:active { background: rgba(37,99,235,0.15); }
+  body.edit-mode .add-activity-btn { display: block; }
+
+  /* ── Edit Modal ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 2000;
+    background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+    align-items: flex-end; justify-content: center;
+  }
+  .modal-overlay.visible { display: flex; }
+  .modal {
+    background: white; border-radius: 20px 20px 0 0; width: 100%; max-width: 500px;
+    padding: 24px 20px; padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    max-height: 85vh; overflow-y: auto;
+  }
+  .modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 16px; color: var(--text); }
+  .modal-field { margin-bottom: 14px; }
+  .modal-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .modal-input {
+    width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+    font-size: 15px; font-family: inherit; color: var(--text); background: var(--bg);
+    outline: none; transition: border-color .2s;
+  }
+  .modal-input:focus { border-color: var(--accent); }
+  .modal-textarea { resize: vertical; min-height: 60px; }
+  .modal-btns { display: flex; gap: 10px; margin-top: 18px; }
+  .modal-btn {
+    flex: 1; padding: 12px; border-radius: 12px; font-size: 15px; font-weight: 600;
+    cursor: pointer; border: none; transition: opacity .15s;
+  }
+  .modal-btn--cancel { background: var(--bg); color: var(--text-secondary); }
+  .modal-btn--save { background: var(--navy); color: white; }
+  .modal-btn:active { opacity: 0.7; }
+
   /* Loading */
   .loading-wrap {
     display: flex; align-items: center; justify-content: center;
@@ -493,8 +553,34 @@
     <div class="header-title">London Trip</div>
     <div class="header-sub">4 – 9 April 2026</div>
   </div>
-  <div class="header-flag">🇬🇧</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <button class="edit-btn" id="edit-toggle" onclick="toggleEditMode()">Edit</button>
+    <div class="header-flag">🇬🇧</div>
+  </div>
 </header>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <h3 id="modal-title">Edit Activity</h3>
+    <div class="modal-field">
+      <div class="modal-label">Time</div>
+      <input class="modal-input" id="modal-time" type="time" placeholder="09:00">
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">Name</div>
+      <input class="modal-input" id="modal-name" placeholder="Activity name">
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">Details</div>
+      <textarea class="modal-input modal-textarea" id="modal-detail" placeholder="Description, address, tips..."></textarea>
+    </div>
+    <div class="modal-btns">
+      <button class="modal-btn modal-btn--cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-btn modal-btn--save" onclick="saveModal()">Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- ══════════════════ SCREEN: ITINERARY ══════════════════ -->
 <div class="screen active" id="screen-itinerary">
@@ -1654,11 +1740,226 @@ function injectActivityLinks() {
   });
 }
 
+// ── Edit Mode ──
+var editMode = false;
+var editTarget = null; // { actEl, dayId } or { newDay: 'day-X' }
+var EDITS_KEY = 'london-trip-2026-edits';
+
+function loadEdits() {
+  try { return JSON.parse(localStorage.getItem(EDITS_KEY)) || {}; } catch(e) { return {}; }
+}
+function saveEdits(data) {
+  localStorage.setItem(EDITS_KEY, JSON.stringify(data));
+}
+
+function toggleEditMode() {
+  editMode = !editMode;
+  document.body.classList.toggle('edit-mode', editMode);
+  document.getElementById('edit-toggle').classList.toggle('active', editMode);
+  document.getElementById('edit-toggle').textContent = editMode ? 'Done' : 'Edit';
+}
+
+function setupEditUI() {
+  // Add action buttons to each activity
+  document.querySelectorAll('.activity').forEach(function(act) {
+    var actions = document.createElement('div');
+    actions.className = 'activity-actions';
+    actions.innerHTML =
+      '<div class="act-btn" onclick="event.stopPropagation();editActivity(this.closest(\'.activity\'))">✎</div>' +
+      '<div class="act-btn act-btn--del" onclick="event.stopPropagation();deleteActivity(this.closest(\'.activity\'))">✕</div>';
+    act.appendChild(actions);
+  });
+  // Add "Add activity" button to each day
+  document.querySelectorAll('.day-body').forEach(function(body) {
+    var dayCard = body.closest('.day-card');
+    var btn = document.createElement('div');
+    btn.className = 'add-activity-btn';
+    btn.textContent = '+ Add activity';
+    btn.onclick = function() { addActivity(dayCard.id); };
+    body.appendChild(btn);
+  });
+}
+
+function editActivity(actEl) {
+  if (!actEl) return;
+  editTarget = { actEl: actEl };
+  var timeEl = actEl.querySelector('.activity-time');
+  var nameEl = actEl.querySelector('.activity-name');
+  var detailEl = actEl.querySelector('.activity-detail');
+  document.getElementById('modal-title').textContent = 'Edit Activity';
+  document.getElementById('modal-time').value = timeEl ? timeEl.textContent.replace(/[^\d:]/g, '') : '';
+  document.getElementById('modal-name').value = nameEl ? nameEl.textContent : '';
+  document.getElementById('modal-detail').value = detailEl ? detailEl.textContent : '';
+  document.getElementById('edit-modal').classList.add('visible');
+}
+
+function addActivity(dayId) {
+  editTarget = { newDay: dayId };
+  document.getElementById('modal-title').textContent = 'New Activity';
+  document.getElementById('modal-time').value = '';
+  document.getElementById('modal-name').value = '';
+  document.getElementById('modal-detail').value = '';
+  document.getElementById('edit-modal').classList.add('visible');
+}
+
+function closeModal() {
+  document.getElementById('edit-modal').classList.remove('visible');
+  editTarget = null;
+}
+
+function saveModal() {
+  var time = document.getElementById('modal-time').value || '';
+  var name = document.getElementById('modal-name').value.trim();
+  var detail = document.getElementById('modal-detail').value.trim();
+  if (!name) { closeModal(); return; }
+
+  // Format time for display
+  var timeDisplay = time;
+  if (time && time.indexOf(':') > -1) {
+    timeDisplay = time; // Already HH:MM
+  }
+
+  if (editTarget && editTarget.actEl) {
+    // Editing existing
+    var act = editTarget.actEl;
+    var timeEl = act.querySelector('.activity-time');
+    var nameEl = act.querySelector('.activity-name');
+    var detailEl = act.querySelector('.activity-detail');
+    if (timeEl) timeEl.textContent = timeDisplay;
+    if (nameEl) nameEl.textContent = name;
+    if (detailEl) detailEl.textContent = detail;
+    else if (detail) {
+      var d = document.createElement('div');
+      d.className = 'activity-detail';
+      d.textContent = detail;
+      nameEl.parentNode.insertBefore(d, nameEl.nextSibling);
+    }
+    persistEdit(act.id, timeDisplay, name, detail);
+  } else if (editTarget && editTarget.newDay) {
+    // Adding new
+    var dayBody = document.querySelector('#' + editTarget.newDay + ' .day-body');
+    var addBtn = dayBody.querySelector('.add-activity-btn');
+    var dayNum = editTarget.newDay.replace('day-', '');
+    var actCount = dayBody.querySelectorAll('.activity').length;
+    var newId = 'd' + dayNum + '-' + actCount;
+
+    var actHtml = document.createElement('div');
+    actHtml.className = 'activity';
+    actHtml.id = 'act-' + newId;
+    actHtml.setAttribute('onclick', "toggleActivity('" + newId + "')");
+    actHtml.innerHTML =
+      '<div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
+      '<div class="activity-content">' +
+        (timeDisplay ? '<div class="activity-time">' + timeDisplay + '</div>' : '') +
+        '<div class="activity-name">' + name + '</div>' +
+        (detail ? '<div class="activity-detail">' + detail + '</div>' : '') +
+      '</div>' +
+      '<div class="activity-actions">' +
+        '<div class="act-btn" onclick="event.stopPropagation();editActivity(this.closest(\'.activity\'))">✎</div>' +
+        '<div class="act-btn act-btn--del" onclick="event.stopPropagation();deleteActivity(this.closest(\'.activity\'))">✕</div>' +
+      '</div>';
+
+    dayBody.insertBefore(actHtml, addBtn);
+
+    // Update dayActivities
+    var dayKey = 'day-' + dayNum;
+    if (!dayActivities[dayKey]) dayActivities[dayKey] = [];
+    dayActivities[dayKey].push(newId);
+    updateAllProgress();
+    persistEdit('act-' + newId, timeDisplay, name, detail, editTarget.newDay);
+  }
+  closeModal();
+}
+
+function deleteActivity(actEl) {
+  if (!actEl) return;
+  actEl.style.opacity = '0';
+  actEl.style.height = actEl.offsetHeight + 'px';
+  actEl.style.transition = 'all .2s';
+  setTimeout(function() {
+    actEl.style.height = '0';
+    actEl.style.padding = '0';
+    actEl.style.overflow = 'hidden';
+  }, 10);
+  setTimeout(function() {
+    actEl.remove();
+    // Remove from dayActivities
+    var rawId = actEl.id.replace('act-', '');
+    Object.keys(dayActivities).forEach(function(day) {
+      var idx = dayActivities[day].indexOf(rawId);
+      if (idx > -1) dayActivities[day].splice(idx, 1);
+    });
+    updateAllProgress();
+    // Persist deletion
+    var edits = loadEdits();
+    edits[actEl.id] = { deleted: true };
+    saveEdits(edits);
+  }, 220);
+}
+
+function persistEdit(actId, time, name, detail, newDay) {
+  var edits = loadEdits();
+  edits[actId] = { time: time, name: name, detail: detail };
+  if (newDay) edits[actId].newDay = newDay;
+  saveEdits(edits);
+}
+
+function applyStoredEdits() {
+  var edits = loadEdits();
+  Object.keys(edits).forEach(function(actId) {
+    var edit = edits[actId];
+    if (edit.deleted) {
+      var el = document.getElementById(actId);
+      if (el) el.remove();
+      return;
+    }
+    if (edit.newDay) {
+      // Re-create added activities
+      var dayBody = document.querySelector('#' + edit.newDay + ' .day-body');
+      if (!dayBody || document.getElementById(actId)) return;
+      var act = document.createElement('div');
+      act.className = 'activity';
+      act.id = actId;
+      var rawId = actId.replace('act-', '');
+      act.setAttribute('onclick', "toggleActivity('" + rawId + "')");
+      act.innerHTML =
+        '<div class="activity-check"><svg class="check-icon" width="12" height="12" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' +
+        '<div class="activity-content">' +
+          (edit.time ? '<div class="activity-time">' + edit.time + '</div>' : '') +
+          '<div class="activity-name">' + edit.name + '</div>' +
+          (edit.detail ? '<div class="activity-detail">' + edit.detail + '</div>' : '') +
+        '</div>';
+      dayBody.appendChild(act);
+      var dayNum = edit.newDay.replace('day-', '');
+      var dayKey = 'day-' + dayNum;
+      if (!dayActivities[dayKey]) dayActivities[dayKey] = [];
+      if (dayActivities[dayKey].indexOf(rawId) === -1) dayActivities[dayKey].push(rawId);
+    } else {
+      // Apply edits to existing activities
+      var el = document.getElementById(actId);
+      if (!el) return;
+      var timeEl = el.querySelector('.activity-time');
+      var nameEl = el.querySelector('.activity-name');
+      var detailEl = el.querySelector('.activity-detail');
+      if (timeEl && edit.time) timeEl.textContent = edit.time;
+      if (nameEl && edit.name) nameEl.textContent = edit.name;
+      if (detailEl && edit.detail) detailEl.textContent = edit.detail;
+    }
+  });
+}
+
+// Close modal on overlay click
+document.getElementById('edit-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
 // ── Init ──
+applyStoredEdits();
 applyStoredProgress();
 updateQuickBtns();
 fetchCurrencyRate();
 injectActivityLinks();
+setupEditUI();
 
 // ── PWA Service Worker ──
 if ('serviceWorker' in navigator) {
