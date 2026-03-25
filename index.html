@@ -221,7 +221,7 @@
 
   /* ── Map Screen ── */
   .map-legend {
-    position: absolute; bottom: 10px; left: 12px; right: 12px; z-index: 1100;
+    position: absolute; bottom: 20px; left: 12px; right: 12px; z-index: 1100;
     background: rgba(255,255,255,0.92);
     backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--border);
@@ -255,7 +255,10 @@
   .map-tool-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
   .map-tool-btn svg { width: 18px; height: 18px; }
 
-  .leaflet-control-attribution { display: none !important; }
+  .leaflet-control-attribution {
+    font-size: 9px !important; background: rgba(255,255,255,0.6) !important;
+    padding: 2px 6px !important; border-radius: 4px 0 0 0 !important;
+  }
 
   /* ── Map Popups ── */
   .leaflet-popup-content-wrapper {
@@ -844,7 +847,7 @@
         <div class="activity-content">
           <div class="activity-time">12:30</div>
           <div class="activity-name">Lunch · Borough Market</div>
-          <div class="activity-detail">8 Southwark St, SE1 1TL. London's oldest food market (1,000+ years!). Packed with artisan stalls — try the raclette, scotch eggs, or padella pasta. Open Wed–Sat. Come hungry and graze from stall to stall, ~£10–15 for a great meal.</div>
+          <div class="activity-detail">8 Southwark St, SE1 1TL. London's oldest food market (1,000+ years!). Packed with artisan stalls — try the raclette, scotch eggs, or padella pasta. Open Mon–Sat (full market Wed–Sat, limited Mon–Tue). Come hungry and graze from stall to stall, ~£10–15 for a great meal.</div>
         </div>
       </div>
       <div class="activity" id="act-d4-3" onclick="toggleActivity('d4-3')">
@@ -1716,7 +1719,7 @@ const activityLinks = {
   'd2-1': { wiki: 'Big_Ben', maps: 'Big Ben, London' },
   'd2-2': { wiki: 'London_Eye', maps: 'London Eye' },
   'd2-3': { wiki: 'Westminster_Abbey', maps: 'Westminster Abbey, London' },
-  'd2-4': { wiki: 'Buckingham_Palace', maps: 'Buckingham Palace, London' },
+  'd2-4': { wiki: 'St_James%27s_Park', maps: 'Buckingham Palace, London' },
   'd2-5': { wiki: 'Dishoom', maps: 'Dishoom Covent Garden, London' },
   'd2-6': { wiki: 'Covent_Garden', maps: 'Covent Garden, London' },
   'd2-7': { wiki: 'Hawksmoor_(restaurant)', maps: 'Hawksmoor Seven Dials, London' },
@@ -1982,8 +1985,7 @@ function saveModal() {
     var dayBody = document.querySelector('#' + editTarget.newDay + ' .day-body');
     var addBtn = dayBody.querySelector('.add-activity-btn');
     var dayNum = editTarget.newDay.replace('day-', '');
-    var actCount = dayBody.querySelectorAll('.activity').length;
-    var newId = 'd' + dayNum + '-' + actCount;
+    var newId = 'd' + dayNum + '-n' + Date.now();
 
     var actHtml = document.createElement('div');
     actHtml.className = 'activity';
