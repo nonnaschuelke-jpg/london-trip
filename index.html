@@ -64,8 +64,8 @@
     display: flex;
     padding-bottom: 0;
   }
-  @media (display-mode: standalone) {
-    .nav { height: calc(var(--nav-h) + 14px); padding-bottom: 14px; }
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .nav { padding-bottom: env(safe-area-inset-bottom); }
   }
   .nav-btn {
     flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
