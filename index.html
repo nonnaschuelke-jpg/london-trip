@@ -569,19 +569,27 @@
     </div>
     <div class="modal-field">
       <div class="modal-label">Name</div>
-      <input class="modal-input" id="modal-name" placeholder="Activity name">
+      <div style="display:flex;gap:8px">
+        <input class="modal-input" id="modal-name" placeholder="e.g. Borough Market" style="flex:1">
+        <button class="modal-btn--save" id="lookup-btn" onclick="lookupPlace()" style="flex:0 0 auto;padding:10px 16px;border-radius:10px;border:none;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">Lookup</button>
+      </div>
+      <div id="lookup-status" style="font-size:11px;color:var(--text-muted);margin-top:4px;display:none"></div>
     </div>
     <div class="modal-field">
       <div class="modal-label">Details</div>
-      <textarea class="modal-input modal-textarea" id="modal-detail" placeholder="Description, address, tips..."></textarea>
+      <textarea class="modal-input modal-textarea" id="modal-detail" placeholder="Auto-filled after lookup, or type your own"></textarea>
     </div>
     <div class="modal-field">
-      <div class="modal-label">Google Maps search (place name or address)</div>
-      <input class="modal-input" id="modal-maps" placeholder="e.g. Borough Market, London">
+      <div class="modal-label">Address</div>
+      <input class="modal-input" id="modal-address" placeholder="Auto-filled after lookup">
     </div>
     <div class="modal-field">
-      <div class="modal-label">Wikipedia article (optional)</div>
-      <input class="modal-input" id="modal-wiki" placeholder="e.g. Borough_Market">
+      <div class="modal-label">Google Maps search</div>
+      <input class="modal-input" id="modal-maps" placeholder="Auto-filled after lookup">
+    </div>
+    <div class="modal-field">
+      <div class="modal-label">Wikipedia article</div>
+      <input class="modal-input" id="modal-wiki" placeholder="Auto-filled after lookup">
     </div>
     <div class="modal-btns">
       <button class="modal-btn modal-btn--cancel" onclick="closeModal()">Cancel</button>
@@ -1800,6 +1808,7 @@ function editActivity(actEl) {
   document.getElementById('modal-time').value = timeEl ? timeEl.textContent.replace(/[^\d:]/g, '') : '';
   document.getElementById('modal-name').value = nameEl ? nameEl.textContent : '';
   document.getElementById('modal-detail').value = detailEl ? detailEl.textContent : '';
+  document.getElementById('modal-address').value = '';
   // Extract Maps query from URL
   if (mapsLink) {
     var mUrl = mapsLink.href || '';
@@ -1827,12 +1836,89 @@ function addActivity(dayId) {
   document.getElementById('modal-detail').value = '';
   document.getElementById('modal-maps').value = '';
   document.getElementById('modal-wiki').value = '';
+  document.getElementById('modal-address').value = '';
   document.getElementById('edit-modal').classList.add('visible');
 }
 
 function closeModal() {
   document.getElementById('edit-modal').classList.remove('visible');
   editTarget = null;
+}
+
+function lookupPlace() {
+  var name = document.getElementById('modal-name').value.trim();
+  if (!name) return;
+  var status = document.getElementById('lookup-status');
+  var btn = document.getElementById('lookup-btn');
+  status.style.display = 'block';
+  status.textContent = 'Looking up...';
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  var query = name + ' London';
+  var wikiDone = false, geoDone = false;
+
+  function checkDone() {
+    if (wikiDone && geoDone) {
+      status.textContent = 'Done! Review and save.';
+      btn.textContent = 'Lookup';
+      btn.disabled = false;
+      setTimeout(function() { status.style.display = 'none'; }, 2000);
+    }
+  }
+
+  // Wikipedia API — search + get extract
+  fetch('https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + encodeURIComponent(query) + '&srlimit=1&format=json&origin=*')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.query && data.query.search && data.query.search.length > 0) {
+        var title = data.query.search[0].title;
+        document.getElementById('modal-wiki').value = title.replace(/ /g, '_');
+        // Get extract for description
+        return fetch('https://en.wikipedia.org/w/api.php?action=query&titles=' + encodeURIComponent(title) + '&prop=extracts&exintro=1&explaintext=1&exsentences=3&format=json&origin=*');
+      }
+    })
+    .then(function(r) { return r ? r.json() : null; })
+    .then(function(data) {
+      if (data && data.query && data.query.pages) {
+        var pages = data.query.pages;
+        var pageId = Object.keys(pages)[0];
+        if (pageId !== '-1' && pages[pageId].extract) {
+          var extract = pages[pageId].extract;
+          // Only fill if detail is empty
+          if (!document.getElementById('modal-detail').value.trim()) {
+            document.getElementById('modal-detail').value = extract;
+          }
+        }
+      }
+      wikiDone = true;
+      checkDone();
+    })
+    .catch(function() { wikiDone = true; checkDone(); });
+
+  // Nominatim API — geocode for address
+  fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(query) + '&format=json&addressdetails=1&limit=1')
+    .then(function(r) { return r.json(); })
+    .then(function(results) {
+      if (results && results.length > 0) {
+        var r = results[0];
+        var addr = r.display_name || '';
+        // Shorten: take first 3-4 parts (before country)
+        var parts = addr.split(', ');
+        var short = parts.slice(0, Math.min(parts.length - 1, 4)).join(', ');
+        document.getElementById('modal-address').value = short;
+        document.getElementById('modal-maps').value = name + ', London';
+      } else {
+        document.getElementById('modal-maps').value = name + ', London';
+      }
+      geoDone = true;
+      checkDone();
+    })
+    .catch(function() {
+      document.getElementById('modal-maps').value = name + ', London';
+      geoDone = true;
+      checkDone();
+    });
 }
 
 function buildLinksHtml(maps, wiki) {
@@ -1855,7 +1941,13 @@ function saveModal() {
   var detail = document.getElementById('modal-detail').value.trim();
   var maps = document.getElementById('modal-maps').value.trim();
   var wiki = document.getElementById('modal-wiki').value.trim();
+  var address = document.getElementById('modal-address').value.trim();
   if (!name) { closeModal(); return; }
+
+  // Prepend address to detail if we have one and it's not already there
+  if (address && detail.indexOf(address) === -1) {
+    detail = address + '. ' + detail;
+  }
 
   var timeDisplay = time;
 
