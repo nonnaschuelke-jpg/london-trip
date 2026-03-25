@@ -1,47 +1,11 @@
-var CACHE_NAME = 'london-trip-v7';
-var URLS_TO_CACHE = [
-  '/london-trip/',
-  '/london-trip/index.html',
-  '/london-trip/manifest.json',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
-];
-
-self.addEventListener('install', function(e) {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(URLS_TO_CACHE);
-    })
-  );
-  self.skipWaiting();
-});
-
+// Minimal service worker — network first, no aggressive caching
+self.addEventListener('install', function() { self.skipWaiting(); });
 self.addEventListener('activate', function(e) {
-  e.waitUntil(
-    caches.keys().then(function(names) {
-      return Promise.all(
-        names.filter(function(n) { return n !== CACHE_NAME; })
-             .map(function(n) { return caches.delete(n); })
-      );
-    })
-  );
+  e.waitUntil(caches.keys().then(function(names) {
+    return Promise.all(names.map(function(n) { return caches.delete(n); }));
+  }));
   self.clients.claim();
 });
-
 self.addEventListener('fetch', function(e) {
-  e.respondWith(
-    fetch(e.request).then(function(response) {
-      // Cache successful responses
-      if (response && response.status === 200) {
-        var clone = response.clone();
-        caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(e.request, clone);
-        });
-      }
-      return response;
-    }).catch(function() {
-      // Offline fallback
-      return caches.match(e.request);
-    })
-  );
+  e.respondWith(fetch(e.request).catch(function() { return caches.match(e.request); }));
 });
